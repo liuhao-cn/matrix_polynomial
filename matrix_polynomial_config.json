@@ -1,0 +1,31 @@
+{
+    "coefficients_a": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.02,
+        0.0
+    ],
+    "coefficients_b": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
+    "matrix": [
+        [
+            0.0,
+            1.0
+        ],
+        [
+            1.0,
+            0.0
+        ]
+    ],
+    "transform_type": "Rad/Circ",
+    "rotation_enabled": false,
+    "num_grids": 12
+}

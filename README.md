@@ -1,4 +1,4 @@
-# Matrix Transform Visualization
+# Matrix Polynomial
 
 A Python application for visualizing matrix transformations and polynomial distortions in 2D space. This tool helps in understanding how different types of grid patterns transform under matrix operations and polynomial mappings.
 
@@ -16,8 +16,8 @@ A Python application for visualizing matrix transformations and polynomial disto
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/matrix-transform.git
-cd matrix-transform
+git clone https://github.com/liuhao-cn/matrix_polynomial.git
+cd matrix_polynomial
 ```
 
 2. Install dependencies:

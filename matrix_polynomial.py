@@ -1,5 +1,5 @@
 """
-Matrix Transform Visualization Tool
+Matrix Polynomial Visualization Tool
 
 This module provides an interactive GUI application for visualizing 2D matrix transformations
 and polynomial distortions. It allows users to explore how different grid patterns transform
@@ -64,12 +64,12 @@ GRID_TYPE_C = 'Circ'
 LINE_STYLE_SOLID = '-'
 LINE_STYLE_DOTTED = '--'  # Changed from ':' to '--' for dashed style
 
-class MatrixTransformApp:
+class MatrixPolynomialApp:
     """
-    Main application class for the Matrix Transform visualization tool.
+    Main application class for the Matrix Polynomial visualization tool.
     
     This class handles the GUI setup, user interactions, and visualization logic
-    for the matrix transformation application. It provides an interactive interface
+    for the matrix polynomial application. It provides an interactive interface
     for exploring various grid patterns and their transformations under matrix
     operations and polynomial mappings.
     
@@ -81,10 +81,10 @@ class MatrixTransformApp:
     """
     def __init__(self, root):
         self.root = root
-        self.root.title("Matrix Transform")
+        self.root.title("Matrix Polynomial")
         
         # Set config file path
-        self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'matrix_transform_config.json')
+        self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'matrix_polynomial_config.json')
         
         # Load saved configuration or use defaults
         self.config = self.load_config()
@@ -752,6 +752,6 @@ class MatrixTransformApp:
 if __name__ == "__main__":
     root = tk.Tk()
     root.state('zoomed')  # Maximize window
-    app = MatrixTransformApp(root)
+    app = MatrixPolynomialApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
