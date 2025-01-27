@@ -4,7 +4,7 @@
         0.0,
         0.0,
         0.0,
-        -0.02,
+        0.0,
         0.0
     ],
     "coefficients_b": [
@@ -18,14 +18,14 @@
     "matrix": [
         [
             0.0,
-            1.0
+            -1.0
         ],
         [
             1.0,
             0.0
         ]
     ],
-    "transform_type": "Rad/Circ",
+    "transform_type": "Circular+Radial",
     "rotation_enabled": false,
-    "num_grids": 12
+    "num_grids": 5
 }

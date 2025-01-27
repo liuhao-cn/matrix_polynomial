@@ -4,13 +4,14 @@ A Python application for visualizing matrix transformations and polynomial disto
 
 ## Features
 
-- Interactive visualization of 2D transformations
+- Interactive GUI for real-time visualization of 2D transformations
 - Multiple grid pattern types (HV, H, V, RC, R, C)
 - Adjustable number of grid lines
 - Optional 45° rotation
 - Real-time parameter adjustments
 - Matrix and polynomial coefficient inputs
 - Configurable visualization settings
+- Command-line interface for basic transformations
 
 ## Installation
 
@@ -27,9 +28,16 @@ pip install -r requirements.txt
 
 ## Usage
 
-Run the application:
+### GUI Interface
+Run the GUI application for interactive visualization:
 ```bash
-python matrix_transform.py
+python matrix_polynomial_GUI.py
+```
+
+### Command Line Interface
+For basic transformations without GUI:
+```bash
+python matrix_polynomial.py
 ```
 
 ### Grid Types
@@ -40,7 +48,7 @@ python matrix_transform.py
 - R: Radial lines only
 - C: Circular lines only
 
-### Controls
+### GUI Controls
 - Enter matrix coefficients in the G Matrix input fields
 - Adjust polynomial coefficients using the a and b input fields
 - Select grid type using the buttons
@@ -49,7 +57,7 @@ python matrix_transform.py
 
 ## Configuration
 
-The application saves its configuration in `matrix_transform_config.json`. This includes:
+The application saves its configuration in `matrix_polynomial_config.json`. This includes:
 - Last used matrix coefficients
 - Polynomial coefficients
 - Grid type selection
