@@ -1,9 +1,30 @@
 """
 Matrix Polynomial Visualization Tool (Optimized Version)
 
-This module provides an optimized version of the matrix polynomial visualization tool
-that uses multiprocessing to speed up computations. The original functionality is preserved
-while performance is improved through parallel processing.
+矩阵多项式可视化工具（优化版）
+
+This module provides a visualization tool for matrix polynomials of the form:
+P(x*I + y*G) = sum(a_i*I + b_i*G)(x*I + y*G)^i, where I is the identity matrix 
+and G is a user-defined 2x2 matrix. The tool shows how these polynomials transform 
+different grid patterns in the complex plane.
+
+本模块提供了一个矩阵多项式可视化工具，用于可视化形如：
+P(x*I + y*G) = sum(a_i*I + b_i*G)(x*I + y*G)^i 的矩阵多项式，其中I为单位矩阵，
+G为用户定义的2x2矩阵。该工具展示这些多项式如何变换复平面中的不同网格模式。
+
+Key Features:
+    - Interactive GUI for matrix G and polynomial coefficients input
+    - Six grid pattern options: H+V, H, V, C+R, C, R
+    - Real-time visualization with input-output plane comparison
+    - Optional 45° rotation for better visualization
+    - Auto-scaling plot ranges for transformed patterns
+
+主要特点：
+    - 用于输入矩阵G和多项式系数的交互式界面
+    - 六种网格模式：水平+垂直、水平、垂直、圆形+径向、圆形、径向
+    - 实时可视化，支持输入-输出平面对比
+    - 可选的45度旋转以获得更好的可视化效果
+    - 自动缩放变换后图案的显示范围
 """
 
 import tkinter as tk
@@ -63,65 +84,113 @@ LINE_STYLE_SOLID = '-'
 LINE_STYLE_DOTTED = '-'  # Changed from ':' to '--' for dashed style
 
 
-def decompose_HyperComplexNumbers(z, G):
+def decompose_HyperComplexNumbers(w: np.ndarray, G: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
-    Decompose a series of hypercomplex numbers into their components.
+    Decompose hypercomplex numbers w = x*I + y*G into their (x,y) components.
     
     Args:
-        z (ndarray): Array of 2x2 matrices representing hypercomplex numbers
-        G (ndarray): The basis matrix G
+        w (np.ndarray): Array of hypercomplex numbers in matrix form.
+            Shape: (2, 2, N) where N is the number of points.
+        G (np.ndarray): The basis matrix G of shape (2, 2).
         
     Returns:
-        tuple: (x, y) components in the I-G basis
+        tuple[np.ndarray, np.ndarray]: A tuple containing:
+            - x (np.ndarray): Coefficients of I, shape (N,)
+            - y (np.ndarray): Coefficients of G, shape (N,)
+
+    将超复数 w = x*I + y*G 分解为其(x,y)分量。
+    
+    参数:
+        w (np.ndarray): 矩阵形式的超复数数组
+            形状: (2, 2, N)，其中N是点的数量
+        G (np.ndarray): 基底矩阵G，形状为(2, 2)
+        
+    返回值:
+        tuple[np.ndarray, np.ndarray]: 包含以下内容的元组:
+            - x (np.ndarray): I的系数，形状为(N,)
+            - y (np.ndarray): G的系数，形状为(N,)
     """
-    x = np.trace(z)/2  # Extract x component using matrix trace
-    y = np.trace(G.transpose() @ z)/2  # Extract y component using G-projection
+    x = np.trace(w)/2  # Extract coefficient of I / 提取I的系数
+    y = np.trace(G.transpose() @ w)/2  # Extract coefficient of G / 提取G的系数
     return x, y
 
 
-def compute_polynomial(x, y, I, G, coeffs_a, coeffs_b):
+def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarray, 
+                      coeffs_a: list[float], coeffs_b: list[float]) -> tuple[np.ndarray, np.ndarray]:
     """
-    Evaluate the matrix polynomial P(z) = sum(a_i*I + b_i*G)(z)^i.
+    Evaluate the matrix polynomial P(x*I + y*G) = sum(a_i*I + b_i*G)(x*I + y*G)^i at given points.
     
     Args:
-        x (ndarray): x-coordinates of input points
-        y (ndarray): y-coordinates of input points
-        I (ndarray): 2x2 identity matrix
-        G (ndarray): 2x2 basis matrix
-        coeffs_a (list): Coefficients for I terms
-        coeffs_b (list): Coefficients for G terms
+        x (np.ndarray): x-coordinates of input points, shape (N,)
+        y (np.ndarray): y-coordinates of input points, shape (N,)
+        I (np.ndarray): 2x2 identity matrix, shape (2, 2)
+        G (np.ndarray): User-defined 2x2 basis matrix, shape (2, 2)
+        coeffs_a (list[float]): Coefficients for I terms, length NUM_COEFFICIENTS
+        coeffs_b (list[float]): Coefficients for G terms, length NUM_COEFFICIENTS
     
     Returns:
-        tuple: (u, v) coordinates of transformed points
-    """
-    # Initialize result matrix
-    result = np.zeros((MATRIX_SIZE, MATRIX_SIZE, NUM_POINTS))
+        tuple[np.ndarray, np.ndarray]: A tuple containing:
+            - u (np.ndarray): x-coordinates after transformation, shape (N,)
+            - v (np.ndarray): y-coordinates after transformation, shape (N,)
+
+    在给定点计算矩阵多项式 P(x*I + y*G) = sum(a_i*I + b_i*G)(x*I + y*G)^i 的值。
     
-    # Compute powers of z = xI + yG and accumulate terms
+    参数:
+        x (np.ndarray): 输入点的x坐标，形状为(N,)
+        y (np.ndarray): 输入点的y坐标，形状为(N,)
+        I (np.ndarray): 2x2单位矩阵，形状为(2, 2)
+        G (np.ndarray): 用户定义的2x2基底矩阵，形状为(2, 2)
+        coeffs_a (list[float]): I项的系数，长度为NUM_COEFFICIENTS
+        coeffs_b (list[float]): G项的系数，长度为NUM_COEFFICIENTS
+    
+    返回值:
+        tuple[np.ndarray, np.ndarray]: 包含以下内容的元组:
+            - u (np.ndarray): 变换后的x坐标，形状为(N,)
+            - v (np.ndarray): 变换后的y坐标，形状为(N,)
+    """
+    result = np.zeros((MATRIX_SIZE, MATRIX_SIZE, NUM_POINTS))  # Initialize result array / 初始化结果数组
+    
     for i in range(NUM_COEFFICIENTS):
         if i==0:
-            # First iteration: z = xI + yG
-            z = np.outer(np.ravel(I), x) + np.outer(np.ravel(G), y)
-            z = np.reshape(z, (2, 2, NUM_POINTS))
-            z1 = z.copy()
+            w = np.outer(np.ravel(I), x) + np.outer(np.ravel(G), y)  # w = x*I + y*G
+            w = np.reshape(w, (2, 2, NUM_POINTS))
+            w1 = w.copy()
         else:
-            # Higher powers: z1 = z1 * z
-            z1 = np.einsum('ijk,jlk->ilk', z1, z)
+            w1 = np.einsum('ijk,jlk->ilk', w1, w)  # Matrix multiplication / 矩阵乘法
         
-        # Add current term: (a_i*I + b_i*G)z^i
-        coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G
-        result += coeff_matrix @ z1
+        coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G  # Current coefficient matrix / 当前系数矩阵
+        result += coeff_matrix @ w1  # Add term to sum / 将项加入求和
     
-    # Convert result back to (u,v) coordinates
-    u, v = decompose_HyperComplexNumbers(result, G)
+    u, v = decompose_HyperComplexNumbers(result, G)  # Extract coordinates / 提取坐标
     return u, v
+
 
 class MatrixPolynomialAppOptimized:
     """
     Optimized version of the Matrix Polynomial visualization tool.
-    Uses multiprocessing for faster computation of transformations.
+    
+    This class provides a graphical interface for visualizing matrix polynomial 
+    transformations with various grid patterns and interactive controls. It uses
+    multiprocessing for faster computation of transformations.
+
+    矩阵多项式可视化工具的优化版本。
+    
+    该类提供了图形界面，用于可视化具有各种网格模式的矩阵多项式变换，并提供交互式控制。
+    使用多进程实现更快的变换计算。
     """
-    def __init__(self, root):
+    
+    def __init__(self, root: tk.Tk) -> None:
+        """
+        Initialize the Matrix Polynomial visualization tool.
+        
+        Args:
+            root (tk.Tk): The main window of the application
+
+        初始化矩阵多项式可视化工具。
+        
+        参数:
+            root (tk.Tk): 应用程序的主窗口
+        """
         self.root = root
         self.root.title("Matrix Polynomial (Optimized)")
         
@@ -238,12 +307,12 @@ class MatrixPolynomialAppOptimized:
         
         # Create grid of transform buttons
         buttons = [
-            (GRID_TYPE_HV, self.transform_hv),
-            (GRID_TYPE_H, self.transform_h),
-            (GRID_TYPE_V, self.transform_v),
-            (GRID_TYPE_RC, self.transform_rc),
-            (GRID_TYPE_C, self.transform_c),
-            (GRID_TYPE_R, self.transform_r)
+            (GRID_TYPE_HV, self.transform),
+            (GRID_TYPE_H, self.transform),
+            (GRID_TYPE_V, self.transform),
+            (GRID_TYPE_RC, self.transform),
+            (GRID_TYPE_C, self.transform),
+            (GRID_TYPE_R, self.transform)
         ]
         
         # Store buttons for later style updates
@@ -296,138 +365,113 @@ class MatrixPolynomialAppOptimized:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
 
-    def get_matrix(self):
+    def get_matrix(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Get the current matrix from the input fields.
+        Get the current matrix values from the input fields.
         
         Returns:
-            tuple: (I, G) where I is the identity matrix and G is the user-defined matrix
+            tuple[np.ndarray, np.ndarray]: A tuple containing:
+                - I (np.ndarray): Identity matrix of shape (2, 2)
+                - G (np.ndarray): User-defined matrix of shape (2, 2)
+
+        从输入框获取当前矩阵值。
+        
+        返回值:
+            tuple[np.ndarray, np.ndarray]: 包含以下内容的元组:
+                - I (np.ndarray): 单位矩阵，形状为(2, 2)
+                - G (np.ndarray): 用户定义的矩阵，形状为(2, 2)
         """
         I = np.eye(MATRIX_SIZE)
         G = np.array([[float(entry.get()) for entry in row] for row in self.matrix_entries])
         G = G/np.sqrt(np.abs(np.linalg.det(G)))
         return I, G
     
-    def get_coefficients(self):
+    def get_coefficients(self) -> tuple[list[float], list[float]]:
         """
         Get the current coefficients from the input fields.
         
         Returns:
-            tuple: (coeffs_a, coeffs_b) where coeffs_a and coeffs_b are lists of coefficients
+            tuple[list[float], list[float]]: A tuple containing:
+                - coeffs_a (list[float]): Coefficients for I terms, length NUM_COEFFICIENTS
+                - coeffs_b (list[float]): Coefficients for G terms, length NUM_COEFFICIENTS
+
+        从输入框获取当前系数。
+        
+        返回值:
+            tuple[list[float], list[float]]: 包含以下内容的元组:
+                - coeffs_a (list[float]): I项的系数，长度为NUM_COEFFICIENTS
+                - coeffs_b (list[float]): G项的系数，长度为NUM_COEFFICIENTS
         """
         coeffs_a = [float(entry.get()) for entry in self.entries_a]
         coeffs_b = [float(entry.get()) for entry in self.entries_b]
         return coeffs_a, coeffs_b
     
-    def generate_points_hv(self):
+    def generate_points(self, grid_type: str) -> list[tuple[np.ndarray, np.ndarray]]:
         """
-        Generate points for the HV grid pattern.
+        Generate points for different grid patterns.
+        
+        Args:
+            grid_type (str): Type of grid pattern to generate. Must be one of:
+                - 'Horizontal+Vertical': Both horizontal and vertical lines
+                - 'Horizontal': Only horizontal lines
+                - 'Vertical': Only vertical lines
+                - 'Circular+Radial': Both circular and radial lines
+                - 'Circular': Only circular lines
+                - 'Radial': Only radial lines
         
         Returns:
-            list: List of (x, y) points
-        """
-        points = []
-        num_grids = self.get_num_grids()
-        # Horizontal lines
-        for i in range(num_grids):
-            y = GRID_RANGE[0] + i * (GRID_RANGE[1] - GRID_RANGE[0]) / (num_grids - 1)
-            x = np.linspace(GRID_RANGE[0], GRID_RANGE[1], NUM_POINTS)
-            points.append((x, [y] * NUM_POINTS))
-        
-        # Vertical lines
-        for i in range(num_grids):
-            x = GRID_RANGE[0] + i * (GRID_RANGE[1] - GRID_RANGE[0]) / (num_grids - 1)
-            y = np.linspace(GRID_RANGE[0], GRID_RANGE[1], NUM_POINTS)
-            points.append(([x] * NUM_POINTS, y))
-        return points
-    
-    def generate_points_h(self):
-        """
-        Generate points for the H grid pattern.
-        
-        Returns:
-            list: List of (x, y) points
-        """
-        x = np.linspace(GRID_RANGE[0], GRID_RANGE[1], NUM_POINTS)
-        points = []
-        num_grids = self.get_num_grids()
-        for y in np.linspace(GRID_RANGE[0], GRID_RANGE[1], num_grids):
-            points.append((x, np.full_like(x, y)))
-        return points
-    
-    def generate_points_v(self):
-        """
-        Generate points for the V grid pattern.
-        
-        Returns:
-            list: List of (x, y) points
-        """
-        y = np.linspace(GRID_RANGE[0], GRID_RANGE[1], NUM_POINTS)
-        points = []
-        num_grids = self.get_num_grids()
-        for x_val in np.linspace(GRID_RANGE[0], GRID_RANGE[1], num_grids):
-            points.append((np.full_like(y, x_val), y))
-        return points
-    
-    def generate_points_rc(self):
-        """
-        Generate points for the RC grid pattern.
-        
-        Returns:
-            list: List of (x, y) points
-        """
-        points = []
-        num_grids = self.get_num_grids()
-        # Circular lines (first half)
-        for i in range(num_grids):
-            radius = MIN_CIRCLE_RADIUS + i * (MAX_CIRCLE_RADIUS - MIN_CIRCLE_RADIUS) / (num_grids - 1)
-            theta = np.linspace(0, 2*np.pi, NUM_POINTS)
-            x = radius * np.cos(theta)
-            y = radius * np.sin(theta)
-            points.append((x, y))
-        
-        # Radial lines (second half)
-        for i in range(num_grids):
-            angle = i * (2*np.pi / num_grids)
-            r = np.linspace(0, GRID_RANGE[1], NUM_POINTS)
-            x = r * np.cos(angle)
-            y = r * np.sin(angle)
-            points.append((x, y))
-        return points
-    
-    def generate_points_r(self):
-        """
-        Generate points for the R grid pattern.
-        
-        Returns:
-            list: List of (x, y) points
-        """
-        points = []
-        num_grids = self.get_num_grids()
-        for i in range(num_grids):
-            angle = i * (2*np.pi / num_grids)
-            r = np.linspace(0, GRID_RANGE[1], NUM_POINTS)
-            x = r * np.cos(angle)
-            y = r * np.sin(angle)
-            points.append((x, y))
-        return points
-    
-    def generate_points_c(self):
-        """
-        Generate points for the C grid pattern.
-        
-        Returns:
-            list: List of (x, y) points
-        """
-        theta = np.linspace(0, 2*np.pi, NUM_POINTS)
-        points = []
-        num_grids = self.get_num_grids()
-        for r in np.linspace(MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS, num_grids):
-            x = r * np.cos(theta)
-            y = r * np.sin(theta)
-            points.append((x, y))
-        return points
+            list[tuple[np.ndarray, np.ndarray]]: List of point pairs, where each pair contains:
+                - x coordinates array of shape (10000,)
+                - y coordinates array of shape (10000,)
 
+        生成不同网格模式的点集。
+        
+        参数:
+            grid_type (str): 要生成的网格模式类型，必须是以下之一：
+                - 'Horizontal+Vertical': 水平和垂直线
+                - 'Horizontal': 仅水平线
+                - 'Vertical': 仅垂直线
+                - 'Circular+Radial': 圆形和径向线
+                - 'Circular': 仅圆形线
+                - 'Radial': 仅径向线
+        
+        返回值:
+            list[tuple[np.ndarray, np.ndarray]]: 点对列表，每个点对包含：
+                - x坐标数组，形状为(10000,)
+                - y坐标数组，形状为(10000,)
+        """
+        points = []
+        num_grids = self.get_num_grids()
+        
+        if 'Horizontal' in grid_type:
+            for i in range(num_grids):
+                y = -2 + i * 4 / (num_grids - 1)
+                x = np.linspace(-2, 2, 10000)
+                points.append((x, np.full(10000, y)))
+        
+        if 'Vertical' in grid_type:
+            for i in range(num_grids):
+                x = -2 + i * 4 / (num_grids - 1)
+                y = np.linspace(-2, 2, 10000)
+                points.append((np.full(10000, x), y))
+        
+        if 'Circular' in grid_type:
+            theta = np.linspace(0, 2*np.pi, 10000)
+            for i in range(num_grids):
+                r = 0.1 + i * 1.9 / (num_grids - 1)
+                x = r * np.cos(theta)
+                y = r * np.sin(theta)
+                points.append((x, y))
+        
+        if 'Radial' in grid_type:
+            r = np.linspace(0, 2, 10000)
+            for i in range(num_grids):
+                angle = i * 2*np.pi / num_grids
+                x = r * np.cos(angle)
+                y = r * np.sin(angle)
+                points.append((x, y))
+        
+        return points
 
     def transform_points(self, points):
         """
@@ -582,45 +626,12 @@ class MatrixPolynomialAppOptimized:
         # Update canvas
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
-    
-    def transform_hv(self):
-        """Transform the HV grid pattern."""
-        self.plot_transformation(self.generate_points_hv(), f" ({GRID_TYPE_HV})")
-    
-    def transform_h(self):
-        """Transform the H grid pattern."""
-        self.plot_transformation(self.generate_points_h(), f" ({GRID_TYPE_H})")
-    
-    def transform_v(self):
-        """Transform the V grid pattern."""
-        self.plot_transformation(self.generate_points_v(), f" ({GRID_TYPE_V})")
-    
-    def transform_rc(self):
-        """Transform the RC grid pattern."""
-        self.plot_transformation(self.generate_points_rc(), f" ({GRID_TYPE_RC})")
-    
-    def transform_r(self):
-        """Transform the R grid pattern."""
-        self.plot_transformation(self.generate_points_r(), f" ({GRID_TYPE_R})")
-    
-    def transform_c(self):
-        """Transform the C grid pattern."""
-        self.plot_transformation(self.generate_points_c(), f" ({GRID_TYPE_C})")
-    
+ 
     def transform(self):
         """
         Transform the current grid pattern.
         """
-        transform_functions = {
-            GRID_TYPE_HV: self.transform_hv,
-            GRID_TYPE_H: self.transform_h,
-            GRID_TYPE_V: self.transform_v,
-            GRID_TYPE_NONE: lambda: None,  # Do nothing for NONE type
-            GRID_TYPE_RC: self.transform_rc,
-            GRID_TYPE_R: self.transform_r,
-            GRID_TYPE_C: self.transform_c
-        }
-        transform_functions[self.current_transform_type]()
+        self.plot_transformation(self.generate_points(self.current_transform_type))
     
     def update_transform_type(self, button_text, command):
         """
@@ -663,15 +674,15 @@ class MatrixPolynomialAppOptimized:
             self.num_grids_entry.delete(0, tk.END)
             self.num_grids_entry.insert(0, str(self.config.get('num_grids', 4)))
     
-    def get_num_grids(self):
+    def get_num_grids(self) -> int:
         """
         Get the current number of grid lines.
         
         Returns:
-            int: Number of grid lines
+            int: Number of grid lines, clamped between 2 and 250
         """
         try:
-            return int(self.num_grids_entry.get())
+            return max(2, min(250, int(self.num_grids_entry.get())))
         except ValueError:
             return 4
     

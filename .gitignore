@@ -29,3 +29,4 @@ wheels/
 
 # Project specific
 matrix_transform_config.json
+matrix_polynomial_config.json
