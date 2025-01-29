@@ -4,8 +4,8 @@
         0.0,
         0.0,
         0.0,
-        0.0,
-        0.001
+        -0.01,
+        0.0
     ],
     "coefficients_b": [
         0.0,
@@ -25,7 +25,7 @@
             0.0
         ]
     ],
-    "transform_type": "Horizontal+Vertical",
+    "transform_type": "Circular",
     "rotation_enabled": false,
-    "num_grids": 8
+    "num_grids": 200
 }

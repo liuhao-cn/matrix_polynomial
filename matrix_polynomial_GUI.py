@@ -13,15 +13,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 import json
 import os
-import multiprocessing as mp
-from functools import partial
 import platform
 
 # Grid Generation Constants
 GRID_RANGE = (-2, 2)  # Range for x and y coordinates
 NUM_POINTS = 10000  # Number of points for line generation
-MIN_CIRCLE_RADIUS = 0.4  # Minimum radius for circular grids
+MIN_CIRCLE_RADIUS = 0.1  # Minimum radius for circular grids
 MAX_CIRCLE_RADIUS = 2.0  # Maximum radius for circular grids
+ALPHA_FEW_LINES = 1.0
+ALPHA_MANY_LINES = 0.6
 
 # GUI Constants
 # Windows-specific GUI parameters
@@ -60,58 +60,80 @@ GRID_TYPE_C = 'Circular'
 
 # Line Style Constants
 LINE_STYLE_SOLID = '-'
-LINE_STYLE_DOTTED = '--'  # Changed from ':' to '--' for dashed style
+LINE_STYLE_DOTTED = '-'  # Changed from ':' to '--' for dashed style
 
-# Number of processes for parallel computation
-NUM_PROCESSES = mp.cpu_count()
 
-def matrix_power(x, y, power, I, G):
+def mm22_series(z1, z2):
     """
-    Compute (xI + yG)^power where G is the user-defined matrix.
-    """
-    if power == 0:
-        return np.eye(MATRIX_SIZE)
+    Multiply two 2x2 matrices element-wise for a series of points.
     
-    # Base matrix xI + yG
-    base = x * I + y * G
-    
-    # Use matrix power
-    return np.linalg.matrix_power(base, power)
-
-def evaluate_polynomial_chunk(chunk_data):
-    """
-    Evaluate polynomial for a chunk of points.
-    """
-    x_chunk, y_chunk, I, G, coeffs_a, coeffs_b = chunk_data
-    
-    # Pre-compute matrices for all points in the chunk
-    P_matrices = np.array([evaluate_single_point(xi, yi, I, G, coeffs_a, coeffs_b) 
-                          for xi, yi in zip(x_chunk, y_chunk)])
-    
-    # Calculate traces using vectorized operations
-    G_T = G.transpose()
-    P_1 = np.trace(P_matrices, axis1=1, axis2=2) / 2
-    P_2 = np.trace(G_T @ P_matrices.transpose(0, 2, 1), axis1=1, axis2=2) / 2
-    
-    return P_1, P_2
-
-def evaluate_single_point(x, y, I, G, coeffs_a, coeffs_b):
-    """
-    Evaluate polynomial at a single point.
-    """
-    # Pre-compute the base matrix and its powers
-    base = x * I + y * G
-    power_terms = [np.eye(MATRIX_SIZE)]  # Power 0
-    for i in range(NUM_COEFFICIENTS):
-        power_terms.append(power_terms[-1] @ base)
-    
-    # Compute the polynomial using pre-computed powers
-    result = np.zeros((MATRIX_SIZE, MATRIX_SIZE))
-    for i in range(NUM_COEFFICIENTS):
-        coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G
-        result += coeff_matrix @ power_terms[i+1]
+    Args:
+        z1 (ndarray): First 2x2xN array of matrices
+        z2 (ndarray): Second 2x2xN array of matrices
         
-    return result
+    Returns:
+        ndarray: Result of matrix multiplication with shape 2x2xN
+    """
+    z = z1*0  # Initialize result array with same shape as input
+    z[0,0] = z1[0,0]*z2[0,0] + z1[0,1]*z2[1,0]
+    z[0,1] = z1[0,0]*z2[0,1] + z1[0,1]*z2[1,1]
+    z[1,0] = z1[1,0]*z2[0,0] + z1[1,1]*z2[1,0]
+    z[1,1] = z1[1,0]*z2[0,1] + z1[1,1]*z2[1,1]
+    return z
+
+
+def decompose_HyperComplexNumbers(z, G):
+    """
+    Decompose a series of hypercomplex numbers into their components.
+    
+    Args:
+        z (ndarray): Array of 2x2 matrices representing hypercomplex numbers
+        G (ndarray): The basis matrix G
+        
+    Returns:
+        tuple: (x, y) components in the I-G basis
+    """
+    x = np.trace(z)/2  # Extract x component using matrix trace
+    y = np.trace(G.transpose() @ z)/2  # Extract y component using G-projection
+    return x, y
+
+
+def compute_polynomial(x, y, I, G, coeffs_a, coeffs_b):
+    """
+    Evaluate the matrix polynomial P(z) = sum(a_i*I + b_i*G)(z)^i.
+    
+    Args:
+        x (ndarray): x-coordinates of input points
+        y (ndarray): y-coordinates of input points
+        I (ndarray): 2x2 identity matrix
+        G (ndarray): 2x2 basis matrix
+        coeffs_a (list): Coefficients for I terms
+        coeffs_b (list): Coefficients for G terms
+    
+    Returns:
+        tuple: (u, v) coordinates of transformed points
+    """
+    # Initialize result matrix
+    result = np.zeros((MATRIX_SIZE, MATRIX_SIZE, NUM_POINTS))
+    
+    # Compute powers of z = xI + yG and accumulate terms
+    for i in range(NUM_COEFFICIENTS):
+        if i==0:
+            # First iteration: z = xI + yG
+            z = np.outer(np.ravel(I), x) + np.outer(np.ravel(G), y)
+            z = np.reshape(z, (2, 2, NUM_POINTS))
+            z1 = z.copy()
+        else:
+            # Higher powers: z1 = z1 * z
+            z1 = mm22_series(z1, z)
+        
+        # Add current term: (a_i*I + b_i*G)z^i
+        coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G
+        result += coeff_matrix @ z1
+    
+    # Convert result back to (u,v) coordinates
+    u, v = decompose_HyperComplexNumbers(result, G)
+    return u, v
 
 class MatrixPolynomialAppOptimized:
     """
@@ -121,9 +143,6 @@ class MatrixPolynomialAppOptimized:
     def __init__(self, root):
         self.root = root
         self.root.title("Matrix Polynomial (Optimized)")
-        
-        # Initialize multiprocessing pool
-        self.pool = mp.Pool(NUM_PROCESSES)
         
         # Set config file path
         self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'matrix_polynomial_config.json')
@@ -295,111 +314,7 @@ class MatrixPolynomialAppOptimized:
         # Bind window closing event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
-    def transform_points(self, points):
-        """
-        Transform points using parallel processing for improved performance.
-        """
-        I, G = self.get_matrix()
-        coeffs_a, coeffs_b = self.get_coefficients()
-        
-        transformed_points = []
-        for x, y in points:
-            # Convert to numpy arrays
-            x = np.array(x)
-            y = np.array(y)
-            
-            # Split data into chunks for parallel processing
-            chunk_size = len(x) // NUM_PROCESSES
-            x_chunks = np.array_split(x, NUM_PROCESSES)
-            y_chunks = np.array_split(y, NUM_PROCESSES)
-            
-            # Prepare data for parallel processing
-            chunk_data = [(x_chunk, y_chunk, I, G, coeffs_a, coeffs_b) 
-                         for x_chunk, y_chunk in zip(x_chunks, y_chunks)]
-            
-            # Process chunks in parallel
-            results = self.pool.map(evaluate_polynomial_chunk, chunk_data)
-            
-            # Combine results
-            P_1 = np.concatenate([r[0] for r in results])
-            P_2 = np.concatenate([r[1] for r in results])
-            
-            # Apply final transformation
-            if self.rotation_enabled.get():
-                # Apply 45-degree rotation: x' = (P1-P2)/√2, y' = (P1+P2)/√2
-                new_x = (P_1 - P_2) / np.sqrt(2)
-                new_y = (P_1 + P_2) / np.sqrt(2)
-            else:
-                new_x, new_y = P_1, P_2
-            
-            transformed_points.append((new_x, new_y))
-        
-        return transformed_points
-    
-    def on_closing(self):
-        """
-        Clean up resources when closing the application.
-        """
-        try:
-            self.save_config()
-            # Clean up matplotlib resources
-            plt.close(self.fig)
-            self.canvas.get_tk_widget().destroy()
-            # Clean up multiprocessing pool
-            self.pool.close()
-            self.pool.join()
-        finally:
-            self.root.quit()
-            self.root.destroy()
-    
-    def load_config(self):
-        """
-        Load saved configuration from JSON file or use default values.
-        
-        Returns:
-            dict: Loaded configuration
-        """
-        default_config = {
-            'coefficients_a': [0.0] * NUM_COEFFICIENTS,
-            'coefficients_b': [0.0] * NUM_COEFFICIENTS,
-            'matrix': [[1.0, 0.0], [0.0, 1.0]],
-            'transform_type': GRID_TYPE_HV,
-            'rotation_enabled': True,
-            'num_grids': 4
-        }
-        
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r') as f:
-                    loaded_config = json.load(f)
-                    # Ensure all required keys exist
-                    for key in default_config:
-                        if key not in loaded_config:
-                            loaded_config[key] = default_config[key]
-                    return loaded_config
-        except Exception as e:
-            print(f"Error loading configuration: {e}")
-        
-        return default_config
-    
-    def save_config(self):
-        """
-        Save current configuration to JSON file.
-        """
-        config = {
-            'coefficients_a': [float(entry.get()) for entry in self.entries_a],
-            'coefficients_b': [float(entry.get()) for entry in self.entries_b],
-            'matrix': [[float(entry.get()) for entry in row] for row in self.matrix_entries],
-            'transform_type': self.current_transform_type,
-            'rotation_enabled': self.rotation_enabled.get(),
-            'num_grids': self.get_num_grids()
-        }
-        try:
-            with open(self.config_file, 'w') as f:
-                json.dump(config, f, indent=4)
-        except Exception as e:
-            print(f"Error saving configuration: {e}")
-            
+
     def get_matrix(self):
         """
         Get the current matrix from the input fields.
@@ -531,6 +446,41 @@ class MatrixPolynomialAppOptimized:
             y = r * np.sin(theta)
             points.append((x, y))
         return points
+
+
+    def transform_points(self, points):
+        """
+        Transform points using the matrix polynomial transformation.
+        
+        This function applies the matrix polynomial transformation to each point:
+        1. Computes the polynomial value using the current matrix G and coefficients
+        2. Optionally applies a 45-degree rotation if enabled
+        
+        Args:
+            points (list): List of (x, y) coordinate tuples to transform
+            
+        Returns:
+            list: List of transformed (u, v) coordinate tuples
+        """
+        p_trans = []
+        for p in points:
+            x, y = p[0], p[1]
+            I, G = self.get_matrix()
+            coeffs_a, coeffs_b = self.get_coefficients()
+
+            u, v = compute_polynomial(x, y, I, G, coeffs_a, coeffs_b)
+            
+            # Apply final transformation
+            if self.rotation_enabled.get():
+                # Apply 45-degree rotation: x' = (P1-P2)/√2, y' = (P1+P2)/√2
+                u1 = (u - v) / np.sqrt(2)
+                v1 = (u + v) / np.sqrt(2)
+            else:
+                u1, v1 = u, v
+            p_trans.append((u1, v1))
+        
+        return p_trans     
+    
     
     def plot_transformation(self, input_points, title_suffix=""):
         """
@@ -559,26 +509,37 @@ class MatrixPolynomialAppOptimized:
             else:
                 return LINE_STYLE_DOTTED
         
-        # Get color based on grid type and index
-        def get_color(idx, title_suffix):
+        # Get color and alpha values based on grid type and index
+        def get_color_and_alpha(idx, title_suffix):
+            num_grids = self.get_num_grids()
+
+            # Determine effective index based on grid type
             if GRID_TYPE_HV in title_suffix or GRID_TYPE_RC in title_suffix:
-                return f'C{(idx % self.get_num_grids())}'
+                idx_eff = idx % num_grids
             else:
-                return f'C{idx}'
+                idx_eff = idx
+
+            if num_grids <= 10:
+                # Use matplotlib default colors C0-C9 with high alpha for few lines
+                return f'C{idx_eff}', ALPHA_FEW_LINES
+            else:
+                # Use viridis colormap with lower alpha for many lines to prevent visual clutter
+                import matplotlib.cm as cm
+                return cm.viridis(idx_eff/(num_grids)), ALPHA_MANY_LINES
         
         # Plot input points and calculate input range
         for idx, (x, y) in enumerate(input_points):
             style = get_line_style(idx, title_suffix)
-            color = get_color(idx, title_suffix)
-            self.ax1.plot(x, y, style, color=color, linewidth=self.current_plot_linewidth)
+            color, alpha = get_color_and_alpha(idx, title_suffix)
+            self.ax1.plot(x, y, style, color=color, linewidth=self.current_plot_linewidth, alpha=alpha)
             input_max_range = max(input_max_range, np.max(np.abs([x, y])))
         
         # Plot transformed points and calculate transformed range
         transformed_points = self.transform_points(input_points)
         for idx, (x, y) in enumerate(transformed_points):
             style = get_line_style(idx, title_suffix)
-            color = get_color(idx, title_suffix)
-            self.ax2.plot(x, y, style, color=color, linewidth=self.current_plot_linewidth)
+            color, alpha = get_color_and_alpha(idx, title_suffix)
+            self.ax2.plot(x, y, style, color=color, linewidth=self.current_plot_linewidth, alpha=alpha)
             transformed_max_range = max(transformed_max_range, np.max(np.abs([x, y])))
         
         # Set plot properties with separate ranges
@@ -711,8 +672,8 @@ class MatrixPolynomialAppOptimized:
             value = int(self.num_grids_entry.get())
             if value < 2:
                 value = 2
-            elif value > 12:
-                value = 12
+            elif value > 250:
+                value = 250
             self.num_grids_entry.delete(0, tk.END)
             self.num_grids_entry.insert(0, str(value))
             self.transform()
@@ -733,13 +694,70 @@ class MatrixPolynomialAppOptimized:
         except ValueError:
             return 4
     
+    def load_config(self):
+        """
+        Load saved configuration from JSON file or use default values.
+        
+        Returns:
+            dict: Loaded configuration
+        """
+        default_config = {
+            'coefficients_a': [0.0] * NUM_COEFFICIENTS,
+            'coefficients_b': [0.0] * NUM_COEFFICIENTS,
+            'matrix': [[1.0, 0.0], [0.0, 1.0]],
+            'transform_type': GRID_TYPE_HV,
+            'rotation_enabled': True,
+            'num_grids': 4
+        }
+        
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    loaded_config = json.load(f)
+                    # Ensure all required keys exist
+                    for key in default_config:
+                        if key not in loaded_config:
+                            loaded_config[key] = default_config[key]
+                    return loaded_config
+        except Exception as e:
+            print(f"Error loading configuration: {e}")
+        
+        return default_config
+    
+    def save_config(self):
+        """
+        Save current configuration to JSON file.
+        """
+        config = {
+            'coefficients_a': [float(entry.get()) for entry in self.entries_a],
+            'coefficients_b': [float(entry.get()) for entry in self.entries_b],
+            'matrix': [[float(entry.get()) for entry in row] for row in self.matrix_entries],
+            'transform_type': self.current_transform_type,
+            'rotation_enabled': self.rotation_enabled.get(),
+            'num_grids': self.get_num_grids()
+        }
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=4)
+        except Exception as e:
+            print(f"Error saving configuration: {e}")
+
+    def on_closing(self):
+        """
+        Clean up resources when closing the application.
+        """
+        try:
+            self.save_config()
+            # Clean up matplotlib resources
+            plt.close(self.fig)
+            self.canvas.get_tk_widget().destroy()
+        finally:
+            self.root.quit()
+            self.root.destroy()   
     # The rest of the methods are identical to the original class
     # [Other methods omitted for brevity - identical to original]
 
 if __name__ == "__main__":
-    # Enable multiprocessing for Windows
-    mp.freeze_support()
-    
     root = tk.Tk()
     
     # Platform-specific window setup

@@ -12,9 +12,13 @@ A Python application for visualizing matrix transformations and polynomial disto
   - Color-mapped transformations
 - Matrix and polynomial coefficient inputs
 - Real-time parameter adjustments
+- Automatic configuration persistence
+- Optional 45° rotation toggle
+- Smart transparency handling for large grid sets
 
 ### Visualization Options
-- Adjustable grid density and point count
+- Adjustable grid density (2-250 lines) with automatic color mapping
+- Intelligent alpha transparency for better visualization of dense grids
 - Configurable plot resolution and binning
 - Color mapping based on position or polar coordinates
 - Performance optimized rendering for large datasets
@@ -63,6 +67,14 @@ python matrix_polynomial.py
 - R: Radial lines only
 - C: Circular lines only
 
+### Grid Visualization Features
+- Automatic color scheme selection based on grid density
+  - Default matplotlib colors for ≤10 lines
+  - Viridis colormap with transparency for >10 lines
+- Adjustable grid density with automatic visual optimization
+- Optional 45° rotation for alternative perspectives
+- Configuration persistence between sessions
+
 ### Scatter Plot Features
 - Position-based color mapping
 - Density-aware visualization
@@ -75,14 +87,16 @@ python matrix_polynomial.py
 ### GUI Settings
 - Adjustable plot size and DPI
 - Configurable font sizes
-- Grid density controls
-- Color scheme selection
+- Grid density controls (2-250 lines)
+- Color scheme selection with automatic transparency
 - Real-time parameter updates
+- Persistent configuration storage
 
 ### Performance Settings
 - Adjustable point count for scatter plots
 - Configurable binning resolution
 - Optimized rendering for large datasets
+- Smart transparency handling for dense grids
 
 ## File Structure
 - `matrix_polynomial_GUI.py`: Main GUI application for grid visualization
@@ -99,8 +113,7 @@ python matrix_polynomial.py
 - Pillow 10.0.0+
 - SciPy 1.11.0+
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Platform Support
+- Windows: Full support with native look and feel
+- Linux: Full support with platform-specific optimizations
+- macOS: Compatible (requires X11)
