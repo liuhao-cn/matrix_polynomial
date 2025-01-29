@@ -63,25 +63,6 @@ LINE_STYLE_SOLID = '-'
 LINE_STYLE_DOTTED = '-'  # Changed from ':' to '--' for dashed style
 
 
-def mm22_series(z1, z2):
-    """
-    Multiply two 2x2 matrices element-wise for a series of points.
-    
-    Args:
-        z1 (ndarray): First 2x2xN array of matrices
-        z2 (ndarray): Second 2x2xN array of matrices
-        
-    Returns:
-        ndarray: Result of matrix multiplication with shape 2x2xN
-    """
-    z = z1*0  # Initialize result array with same shape as input
-    z[0,0] = z1[0,0]*z2[0,0] + z1[0,1]*z2[1,0]
-    z[0,1] = z1[0,0]*z2[0,1] + z1[0,1]*z2[1,1]
-    z[1,0] = z1[1,0]*z2[0,0] + z1[1,1]*z2[1,0]
-    z[1,1] = z1[1,0]*z2[0,1] + z1[1,1]*z2[1,1]
-    return z
-
-
 def decompose_HyperComplexNumbers(z, G):
     """
     Decompose a series of hypercomplex numbers into their components.
@@ -125,7 +106,7 @@ def compute_polynomial(x, y, I, G, coeffs_a, coeffs_b):
             z1 = z.copy()
         else:
             # Higher powers: z1 = z1 * z
-            z1 = mm22_series(z1, z)
+            z1 = np.einsum('ijk,jlk->ilk', z1, z)
         
         # Add current term: (a_i*I + b_i*G)z^i
         coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G
