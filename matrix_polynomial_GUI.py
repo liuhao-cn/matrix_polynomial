@@ -1,7 +1,7 @@
 """
-Matrix Polynomial Visualization Tool (Optimized Version)
+Matrix Polynomial Visualization Tool
 
-矩阵多项式可视化工具（优化版）
+矩阵多项式可视化工具
 
 This module provides a visualization tool for matrix polynomials of the form:
 P(x*I + y*G) = sum(a_i*I + b_i*G)(x*I + y*G)^i, where I is the identity matrix 
@@ -16,15 +16,17 @@ Key Features:
     - Interactive GUI for matrix G and polynomial coefficients input
     - Six grid pattern options: H+V, H, V, C+R, C, R
     - Real-time visualization with input-output plane comparison
-    - Optional 45° rotation for better visualization
+    - Adjustable plot range
     - Auto-scaling plot ranges for transformed patterns
+    - Save plots as PDF files
 
 主要特点：
     - 用于输入矩阵G和多项式系数的交互式界面
     - 六种网格模式：水平+垂直、水平、垂直、圆形+径向、圆形、径向
     - 实时可视化，支持输入-输出平面对比
-    - 可选的45度旋转以获得更好的可视化效果
+    - 可调节的绘图范围
     - 自动缩放变换后图案的显示范围
+    - 将图形保存为PDF文件
 """
 
 import tkinter as tk
@@ -35,20 +37,23 @@ import numpy as np
 import json
 import os
 import platform
+from tkinter import filedialog
+import datetime
+from pathlib import Path
 
 # Grid Generation Constants
-GRID_RANGE = (-2, 2)  # Range for x and y coordinates
-NUM_POINTS = 10000  # Number of points for line generation
-MIN_CIRCLE_RADIUS = 0.1  # Minimum radius for circular grids
+GRID_RANGE = (-2, 2)  # Range for x and y coordinates / x和y坐标的范围
+NUM_POINTS = 10000    # Number of points for line generation / 线段生成的点数
+MIN_CIRCLE_RADIUS = 0.1  # Minimum radius for circular grids / 圆形网格的最小半径
 MAX_CIRCLE_RADIUS = 2.0  # Maximum radius for circular grids
-ALPHA_FEW_LINES = 1.0
-ALPHA_MANY_LINES = 0.6
+ALPHA_FEW_LINES = 1.0    # Alpha value for few grid lines / 网格线较少时的透明度
+ALPHA_MANY_LINES = 0.6   # Alpha value for many grid lines / 网格线较多时的透明度
 
 # GUI Constants
 # Windows-specific GUI parameters
 WIN_FONT_SIZE = 23
 WIN_BUTTON_PADDING = (10, 0)
-WIN_ENTRY_WIDTH = 7  # Increased from 6 to 7 (about 20% more)
+WIN_ENTRY_WIDTH = 6  # Increased from 6 to 7 (about 20% more)
 WIN_PLOT_DPI = 600
 WIN_PLOT_LINEWIDTH = 0.7
 WIN_PLOT_FONTSIZE = 5
@@ -83,6 +88,14 @@ GRID_TYPE_C = 'Circular'
 LINE_STYLE_SOLID = '-'
 LINE_STYLE_DOTTED = '-'  # Changed from ':' to '--' for dashed style
 
+# New constant
+OUTPUT_DIR = "output"  # Output directory for PDF files / PDF文件的输出目录
+INFO_DISPLAY_TIME = 15000  # Time (ms) to display info message / 信息显示时间（毫秒）
+
+# 添加新的常量
+SCAN_STEP = 0.02  # Step size for coefficient scanning / 系数扫描的步长
+SCAN_RANGE = (-1.0, 1.0)  # Range for scanning / 扫描范围
+SCAN_DELAY = 100  # Delay between scans (ms) / 扫描间隔（毫秒）
 
 def decompose_HyperComplexNumbers(w: np.ndarray, G: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -165,18 +178,16 @@ def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarra
     return u, v
 
 
-class MatrixPolynomialAppOptimized:
+class MatrixPolynomialApp:
     """
-    Optimized version of the Matrix Polynomial visualization tool.
+    Matrix Polynomial visualization tool.
     
     This class provides a graphical interface for visualizing matrix polynomial 
-    transformations with various grid patterns and interactive controls. It uses
-    multiprocessing for faster computation of transformations.
+    transformations with various grid patterns and interactive controls.
 
-    矩阵多项式可视化工具的优化版本。
+    矩阵多项式可视化工具。
     
     该类提供了图形界面，用于可视化具有各种网格模式的矩阵多项式变换，并提供交互式控制。
-    使用多进程实现更快的变换计算。
     """
     
     def __init__(self, root: tk.Tk) -> None:
@@ -192,7 +203,7 @@ class MatrixPolynomialAppOptimized:
             root (tk.Tk): 应用程序的主窗口
         """
         self.root = root
-        self.root.title("Matrix Polynomial (Optimized)")
+        self.root.title("Matrix Polynomial")
         
         # Set config file path
         self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'matrix_polynomial_config.json')
@@ -230,6 +241,15 @@ class MatrixPolynomialAppOptimized:
                        background='#ffffff',
                        foreground='#000000')
 
+        # Add info message style
+        style.configure('Info.TLabel', 
+                       font=(FONT_FAMILY, self.current_font_size),
+                       foreground='green')
+
+        # Add scan button style with bold font
+        style.configure('Scan.TButton',
+                       font=(FONT_FAMILY, self.current_font_size, 'bold'))  # 添加粗体样式
+
         # Create main frame
         main_frame = ttk.Frame(root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -264,28 +284,51 @@ class MatrixPolynomialAppOptimized:
         entry_frame = ttk.Frame(coeff_frame)
         entry_frame.grid(row=0, column=0, sticky='w')
         
-        # Add order labels in a single row at the top
+        # Replace Order labels with Scan buttons
+        self.scan_buttons = []
         for i in range(NUM_COEFFICIENTS):
-            ttk.Label(entry_frame, text=f"Order {i+1}", style='Header.TLabel').grid(row=0, column=i+1, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
+            scan_button = ttk.Button(entry_frame,
+                                   text=f"Scan {i+1}",
+                                   command=lambda x=i: self.start_scan(x),
+                                   style='Scan.TButton',  # 使用新的粗体样式
+                                   width=self.current_entry_width)
+            scan_button.grid(row=0, 
+                            column=i+1, 
+                            padx=3 if is_linux else 5, 
+                            pady=1 if is_linux else 2,
+                            sticky='ew')
+            self.scan_buttons.append(scan_button)
+        
+        # Add scanning state variables
+        self.current_scan = None  # Track current scanning process
+        self.scanning = False     # Flag to indicate if scanning is active
         
         # Add I and G labels on the left
-        ttk.Label(entry_frame, text="I:", style='Header.TLabel').grid(row=1, column=0, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
-        ttk.Label(entry_frame, text="G:", style='Header.TLabel').grid(row=2, column=0, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
+        ttk.Label(entry_frame, text="I:", style='Header.TLabel').grid(
+            row=1, column=0, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
+        ttk.Label(entry_frame, text="G:", style='Header.TLabel').grid(
+            row=2, column=0, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
         
         # Create entry fields for each order
         self.entries_a = []
         self.entries_b = []
         for i in range(NUM_COEFFICIENTS):
             # Entry for I coefficient (upper row)
-            entry_a = ttk.Entry(entry_frame, width=self.current_entry_width, style='Big.TEntry', font=(FONT_FAMILY, self.current_font_size))
+            entry_a = ttk.Entry(entry_frame, 
+                               width=self.current_entry_width,
+                               style='Big.TEntry',
+                               font=(FONT_FAMILY, self.current_font_size))
             entry_a.insert(0, str(self.config['coefficients_a'][i]))
-            entry_a.grid(row=1, column=i+1, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
+            entry_a.grid(row=1, column=i+1, padx=3 if is_linux else 5, pady=1 if is_linux else 2, sticky='ew')
             entry_a.bind('<Return>', lambda e: self.transform())
             
             # Entry for G coefficient (lower row)
-            entry_b = ttk.Entry(entry_frame, width=self.current_entry_width, style='Big.TEntry', font=(FONT_FAMILY, self.current_font_size))
+            entry_b = ttk.Entry(entry_frame,
+                               width=self.current_entry_width,
+                               style='Big.TEntry',
+                               font=(FONT_FAMILY, self.current_font_size))
             entry_b.insert(0, str(self.config['coefficients_b'][i]))
-            entry_b.grid(row=2, column=i+1, padx=3 if is_linux else 5, pady=1 if is_linux else 2)
+            entry_b.grid(row=2, column=i+1, padx=3 if is_linux else 5, pady=1 if is_linux else 2, sticky='ew')
             entry_b.bind('<Return>', lambda e: self.transform())
             
             # Store entries for later access
@@ -327,24 +370,30 @@ class MatrixPolynomialAppOptimized:
             btn.grid(row=row + 2, column=col, padx=4, pady=0, sticky=(tk.W, tk.E))
             self.transform_buttons[text] = btn
         
-        # Add NUM_GRIDS input box
-        num_grids_frame = ttk.Frame(button_frame)
-        num_grids_frame.grid(row=2, column=3, padx=4, pady=(0, 0), sticky=(tk.W, tk.E))
-        
-        ttk.Label(num_grids_frame, text="Number of lines: ", style='Big.TLabel').grid(row=0, column=0, padx=(10, 2), sticky=tk.E)
-        self.num_grids_entry = ttk.Entry(num_grids_frame, width=3, style='Big.TEntry', font=(FONT_FAMILY, self.current_font_size))
-        self.num_grids_entry.grid(row=0, column=1, sticky=tk.W)
+        # Create a frame for both entries
+        control_frame = ttk.Frame(button_frame)
+        control_frame.grid(row=2, column=3, rowspan=2, padx=4, pady=(0, 0), sticky=(tk.W, tk.E))
+        control_frame.grid_columnconfigure(1, minsize=50)  # 设置第二列（输入框列）的最小宽度
+
+        # Number of lines entry
+        ttk.Label(control_frame, text="Number of lines:", style='Big.TLabel').grid(
+            row=0, column=0, padx=(10, 2), sticky=tk.E)
+        self.num_grids_entry = ttk.Entry(control_frame, width=3, style='Big.TEntry',
+                                        font=(FONT_FAMILY, self.current_font_size))
+        self.num_grids_entry.grid(row=0, column=1, sticky=tk.E)
         self.num_grids_entry.insert(0, str(self.config.get('num_grids', 4)))
         self.num_grids_entry.bind('<Return>', lambda e: self.update_num_grids())
         self.num_grids_entry.bind('<FocusOut>', lambda e: self.update_num_grids())
-        
-        # Add rotation toggle button
-        self.rotation_enabled = tk.BooleanVar(value=self.config.get('rotation_enabled', True))
-        rotation_btn = ttk.Checkbutton(button_frame, text="    45° Rotation ", 
-                                     variable=self.rotation_enabled,
-                                     command=self.transform,
-                                     style='Switch.TCheckbutton')
-        rotation_btn.grid(row=3, column=3, padx=19, pady=0, sticky=(tk.N, tk.S, tk.E, tk.W))
+
+        # Plot range entry
+        ttk.Label(control_frame, text="Plot Range: ±", style='Big.TLabel').grid(
+            row=1, column=0, padx=(10, 2), sticky=tk.E)
+        self.range_entry = ttk.Entry(control_frame, width=3, style='Big.TEntry',
+                                    font=(FONT_FAMILY, self.current_font_size))
+        self.range_entry.grid(row=1, column=1, sticky=tk.E)
+        self.range_entry.insert(0, str(abs(GRID_RANGE[0])))
+        self.range_entry.bind('<Return>', lambda e: self.update_range())
+        self.range_entry.bind('<FocusOut>', lambda e: self.update_range())
         
         # Set initial selection from config
         self.current_transform_type = self.config['transform_type']
@@ -360,6 +409,19 @@ class MatrixPolynomialAppOptimized:
         self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2, figsize=self.current_figure_size)
         self.canvas = FigureCanvasTkAgg(self.fig, master=root)
         self.canvas.get_tk_widget().grid(row=1, column=0, padx=3 if is_linux else 10, pady=3 if is_linux else 10)
+        
+        # Add save button
+        save_button = ttk.Button(button_frame, 
+                                text="Save\nPDF", 
+                                command=self.save_plot_as_pdf,
+                                style='Big.TButton',
+                                width=7)  # 设置较小的固定宽度
+        save_button.grid(row=2, 
+                        column=4, 
+                        rowspan=2, 
+                        padx=2,  # 减小水平padding
+                        pady=1, 
+                        sticky=(tk.N, tk.S, tk.E, tk.W))
         
         # Bind window closing event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -445,26 +507,27 @@ class MatrixPolynomialAppOptimized:
         
         if 'Horizontal' in grid_type:
             for i in range(num_grids):
-                y = -2 + i * 4 / (num_grids - 1)
-                x = np.linspace(-2, 2, 10000)
+                y = GRID_RANGE[0] + i * (GRID_RANGE[1] - GRID_RANGE[0]) / (num_grids - 1)
+                x = np.linspace(GRID_RANGE[0], GRID_RANGE[1], 10000)
                 points.append((x, np.full(10000, y)))
         
         if 'Vertical' in grid_type:
             for i in range(num_grids):
-                x = -2 + i * 4 / (num_grids - 1)
-                y = np.linspace(-2, 2, 10000)
+                x = GRID_RANGE[0] + i * (GRID_RANGE[1] - GRID_RANGE[0]) / (num_grids - 1)
+                y = np.linspace(GRID_RANGE[0], GRID_RANGE[1], 10000)
                 points.append((np.full(10000, x), y))
         
         if 'Circular' in grid_type:
             theta = np.linspace(0, 2*np.pi, 10000)
+            max_radius = abs(GRID_RANGE[1])
             for i in range(num_grids):
-                r = 0.1 + i * 1.9 / (num_grids - 1)
+                r = 0.1 + i * (max_radius - 0.1) / (num_grids - 1)
                 x = r * np.cos(theta)
                 y = r * np.sin(theta)
                 points.append((x, y))
         
         if 'Radial' in grid_type:
-            r = np.linspace(0, 2, 10000)
+            r = np.linspace(0, abs(GRID_RANGE[1]), 10000)
             for i in range(num_grids):
                 angle = i * 2*np.pi / num_grids
                 x = r * np.cos(angle)
@@ -496,26 +559,31 @@ class MatrixPolynomialAppOptimized:
             u, v = compute_polynomial(x, y, I, G, coeffs_a, coeffs_b)
             
             # Apply final transformation
-            if self.rotation_enabled.get():
-                # Apply 45-degree rotation: x' = (P1-P2)/√2, y' = (P1+P2)/√2
-                u1 = (u - v) / np.sqrt(2)
-                v1 = (u + v) / np.sqrt(2)
-            else:
-                u1, v1 = u, v
+            u1, v1 = u, v
             p_trans.append((u1, v1))
         
         return p_trans     
     
     
-    def plot_transformation(self, input_points, title_suffix=""):
+    def plot_transformation(self, input_points: list[tuple[np.ndarray, np.ndarray]], 
+                           title_suffix: str = "") -> None:
         """
-        Plot the transformation of the given points.
+        Plot the transformation of input points in both input and output planes.
         
         Args:
-            input_points (list): List of (x, y) points
-            title_suffix (str): Suffix for the plot title
+            points (list[tuple[np.ndarray, np.ndarray]]): List of point pairs to transform,
+                where each pair contains x and y coordinate arrays of shape (10000,)
+            title_suffix (str, optional): Additional text to append to plot titles.
+                Defaults to empty string.
+
+        在输入平面和输出平面上绘制点的变换结果。
+        
+        参数:
+            points (list[tuple[np.ndarray, np.ndarray]]): 要变换的点对列表，
+                每个点对包含形状为(10000,)的x和y坐标数组
+            title_suffix (str, optional): 要附加到图表标题的额外文本。
+                默认为空字符串。
         """
-        # Clear the plots
         self.ax1.clear()
         self.ax2.clear()
         
@@ -691,14 +759,28 @@ class MatrixPolynomialAppOptimized:
         Load saved configuration from JSON file or use default values.
         
         Returns:
-            dict: Loaded configuration
+            dict: Configuration dictionary containing:
+                - coefficients_a (list[float]): Coefficients for I terms
+                - coefficients_b (list[float]): Coefficients for G terms
+                - matrix (list[list[float]]): 2x2 matrix G
+                - transform_type (str): Current grid pattern type
+                - num_grids (int): Number of grid lines
+
+        从JSON文件加载保存的配置或使用默认值。
+        
+        返回值:
+            dict: 配置字典，包含：
+                - coefficients_a (list[float]): I项的系数
+                - coefficients_b (list[float]): G项的系数
+                - matrix (list[list[float]]): 2x2矩阵G
+                - transform_type (str): 当前网格模式类型
+                - num_grids (int): 网格线数量
         """
         default_config = {
             'coefficients_a': [0.0] * NUM_COEFFICIENTS,
             'coefficients_b': [0.0] * NUM_COEFFICIENTS,
             'matrix': [[1.0, 0.0], [0.0, 1.0]],
             'transform_type': GRID_TYPE_HV,
-            'rotation_enabled': True,
             'num_grids': 4
         }
         
@@ -719,13 +801,28 @@ class MatrixPolynomialAppOptimized:
     def save_config(self):
         """
         Save current configuration to JSON file.
+        
+        The configuration includes:
+            - Matrix G values
+            - Polynomial coefficients
+            - Current transform type
+            - Number of grid lines
+            - Plot range
+
+        将当前配置保存到JSON文件。
+        
+        配置包括：
+            - 矩阵G的值
+            - 多项式系数
+            - 当前变换类型
+            - 网格线数量
+            - 绘图范围
         """
         config = {
             'coefficients_a': [float(entry.get()) for entry in self.entries_a],
             'coefficients_b': [float(entry.get()) for entry in self.entries_b],
             'matrix': [[float(entry.get()) for entry in row] for row in self.matrix_entries],
             'transform_type': self.current_transform_type,
-            'rotation_enabled': self.rotation_enabled.get(),
             'num_grids': self.get_num_grids()
         }
         try:
@@ -746,8 +843,195 @@ class MatrixPolynomialAppOptimized:
         finally:
             self.root.quit()
             self.root.destroy()   
-    # The rest of the methods are identical to the original class
-    # [Other methods omitted for brevity - identical to original]
+
+    def update_range(self, *args) -> None:
+        """
+        Update the grid range based on user input.
+        
+        The range will be set to [-value, value] where value is the user input,
+        clamped between 0.1 and 100.
+
+        更新网格范围，基于用户输入。
+        
+        范围将被设置为[-value, value]，其中value是用户输入值，
+        限制在0.1到100之间。
+        """
+        try:
+            value = float(self.range_entry.get())
+            value = max(0.1, min(100, value))
+            self.range_entry.delete(0, tk.END)
+            self.range_entry.insert(0, str(value))
+            global GRID_RANGE
+            GRID_RANGE = (-value, value)
+            self.transform()
+        except ValueError:
+            self.range_entry.delete(0, tk.END)
+            self.range_entry.insert(0, str(abs(GRID_RANGE[0])))
+
+    def show_info(self, message: str) -> None:
+        """
+        Show information message in the UI and console.
+        
+        Args:
+            message (str): Message to display
+
+        在UI和控制台显示信息。
+        
+        参数:
+            message (str): 要显示的信息
+        """
+        # Print to console
+        print(message)
+        
+        # Show in UI
+        if hasattr(self, 'info_label'):
+            self.info_label.destroy()
+        
+        self.info_label = ttk.Label(self.root, text=message, style='Info.TLabel')
+        self.info_label.grid(row=2, column=0, padx=5, pady=5)
+        
+        # Schedule label removal
+        self.root.after(INFO_DISPLAY_TIME, self.clear_info)
+
+    def clear_info(self) -> None:
+        """
+        Clear the information message from UI.
+        
+        从UI中清除信息提示。
+        """
+        if hasattr(self, 'info_label'):
+            self.info_label.destroy()
+            del self.info_label
+
+    def save_plot_as_pdf(self) -> None:
+        """
+        Save the current plot as a PDF file in the output directory.
+        The default filename includes the current date and time.
+
+        将当前图形保存为PDF文件到输出目录。
+        默认文件名包含当前日期和时间。
+        """
+        try:
+            # Create output directory if it doesn't exist
+            output_path = Path(os.path.dirname(os.path.abspath(__file__))) / OUTPUT_DIR
+            output_path.mkdir(exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = output_path / f"matrix_polynomial_{timestamp}.pdf"
+            
+            # Temporarily adjust figure size for better PDF quality
+            original_size = self.fig.get_size_inches()
+            self.fig.set_size_inches(12, 6)
+            
+            # Save with high DPI
+            self.fig.savefig(filename, format='pdf', dpi=300, bbox_inches='tight')
+            
+            # Restore original figure size
+            self.fig.set_size_inches(*original_size)
+            
+            # Update canvas
+            self.canvas.draw()
+            
+            # Show success message
+            self.show_info(f"PDF saved: {filename}")
+            
+        except Exception as e:
+            error_msg = f"Error saving PDF: {e}"
+            print(error_msg)
+            self.show_info(error_msg)
+
+    def start_scan(self, order: int) -> None:
+        """
+        Start scanning coefficients for the specified order.
+        
+        Args:
+            order (int): The order to scan (0-5)
+
+        开始扫描指定阶数的系数。
+        
+        参数:
+            order (int): 要扫描的阶数 (0-5)
+        """
+        if self.scanning:
+            self.stop_scan()
+        
+        self.scanning = True
+        self.current_scan = {
+            'order': order,
+            'value': SCAN_RANGE[0],
+            'original_a': float(self.entries_a[order].get()),
+            'original_b': float(self.entries_b[order].get())
+        }
+        
+        # Update button text and command
+        self.scan_buttons[order].configure(
+            text="Stop",
+            command=lambda: self.stop_scan()  # 直接绑定到stop_scan
+        )
+        
+        # Start scanning
+        self.continue_scan()
+        
+    def stop_scan(self) -> None:
+        """
+        Stop the current scanning process and restore original values.
+        
+        停止当前扫描过程并恢复原始值。
+        """
+        if self.scanning and self.current_scan:
+            order = self.current_scan['order']
+            
+            # Restore original values
+            self.entries_a[order].delete(0, tk.END)
+            self.entries_b[order].delete(0, tk.END)
+            self.entries_a[order].insert(0, str(self.current_scan['original_a']))
+            self.entries_b[order].insert(0, str(self.current_scan['original_b']))
+            
+            # Reset button text and command
+            self.scan_buttons[order].configure(
+                text=f"Scan {order+1}",
+                command=lambda x=order: self.start_scan(x)  # 重新绑定到start_scan
+            )
+            
+            # Reset scanning state
+            self.scanning = False
+            self.current_scan = None
+            
+            # Update plot with original values
+            self.transform()
+            
+    def continue_scan(self) -> None:
+        """
+        Continue the scanning process with the next value.
+        
+        继续扫描过程，使用下一个值。
+        """
+        if not self.scanning or not self.current_scan:
+            return
+            
+        current_value = self.current_scan['value']
+        order = self.current_scan['order']
+        
+        if current_value > SCAN_RANGE[1]:
+            self.stop_scan()
+            return
+            
+        # Update coefficients
+        original_a = self.current_scan['original_a']
+        original_b = self.current_scan['original_b']
+        
+        self.entries_a[order].delete(0, tk.END)
+        self.entries_b[order].delete(0, tk.END)
+        self.entries_a[order].insert(0, str(original_a * current_value))
+        self.entries_b[order].insert(0, str(original_b * current_value))
+        
+        # Update plot
+        self.transform()
+        
+        # Schedule next scan
+        self.current_scan['value'] += SCAN_STEP
+        self.root.after(SCAN_DELAY, self.continue_scan)
 
 if __name__ == "__main__":
     root = tk.Tk()
@@ -769,6 +1053,6 @@ if __name__ == "__main__":
         # Windows-specific window maximization
         root.state('zoomed')
     
-    app = MatrixPolynomialAppOptimized(root)
+    app = MatrixPolynomialApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
