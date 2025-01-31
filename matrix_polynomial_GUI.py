@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 import json
-import os
+import os, sys
 import platform
 from tkinter import filedialog
 import datetime
@@ -124,7 +124,7 @@ def decompose_HyperComplexNumbers(w: np.ndarray, G: np.ndarray) -> tuple[np.ndar
             - y (np.ndarray): G的系数，形状为(N,)
     """
     x = np.trace(w)/2  # Extract coefficient of I / 提取I的系数
-    y = np.trace(G.transpose() @ w)/2  # Extract coefficient of G / 提取G的系数
+    y = np.trace(G @ w)/2  # Extract coefficient of G / 提取G的系数
     return x, y
 
 
@@ -171,9 +171,9 @@ def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarra
         else:
             w1 = np.einsum('ijk,jlk->ilk', w1, w)  # Matrix multiplication / 矩阵乘法
         
-        coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G  # Current coefficient matrix / 当前系数矩阵
+        coeff_matrix = coeffs_a[i] * I + coeffs_b[i] * G.transpose()  # Current coefficient matrix / 当前系数矩阵
         result += coeff_matrix @ w1  # Add term to sum / 将项加入求和
-    
+
     u, v = decompose_HyperComplexNumbers(result, G)  # Extract coordinates / 提取坐标
     return u, v
 
@@ -643,8 +643,8 @@ class MatrixPolynomialApp:
         self.ax1.set_aspect('equal')
         self.ax1.set_xlim(-input_plot_range, input_plot_range)
         self.ax1.set_ylim(-input_plot_range, input_plot_range)
-        self.ax1.axhline(y=0, color='gray', linewidth=0.5)
-        self.ax1.axvline(x=0, color='gray', linewidth=0.5)
+        self.ax1.axhline(y=0, color='gray', linewidth=0.2)
+        self.ax1.axvline(x=0, color='gray', linewidth=0.2)
         # Set 5 ticks on each axis
         self.ax1.set_xticks(np.linspace(-input_plot_range, input_plot_range, 5))
         self.ax1.set_yticks(np.linspace(-input_plot_range, input_plot_range, 5))
@@ -653,8 +653,8 @@ class MatrixPolynomialApp:
         self.ax2.set_aspect('equal')
         self.ax2.set_xlim(-transformed_plot_range, transformed_plot_range)
         self.ax2.set_ylim(-transformed_plot_range, transformed_plot_range)
-        self.ax2.axhline(y=0, color='gray', linewidth=0.5)
-        self.ax2.axvline(x=0, color='gray', linewidth=0.5)
+        self.ax2.axhline(y=0, color='gray', linewidth=0.2)
+        self.ax2.axvline(x=0, color='gray', linewidth=0.2)
         # Set 5 ticks on each axis
         self.ax2.set_xticks(np.linspace(-transformed_plot_range, transformed_plot_range, 5))
         self.ax2.set_yticks(np.linspace(-transformed_plot_range, transformed_plot_range, 5))

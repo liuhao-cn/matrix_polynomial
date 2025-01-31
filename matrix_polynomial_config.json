@@ -1,6 +1,6 @@
 {
     "coefficients_a": [
-        1.0,
+        0.0,
         0.0,
         0.0,
         0.0,
@@ -9,22 +9,22 @@
     ],
     "coefficients_b": [
         0.0,
+        1.0,
         0.0,
         0.0,
         0.0,
-        0.03,
         0.0
     ],
     "matrix": [
         [
             0.0,
-            1.0
+            -1.0
         ],
         [
             1.0,
             0.0
         ]
     ],
-    "transform_type": "Horizontal+Vertical",
-    "num_grids": 16
+    "transform_type": "Radial",
+    "num_grids": 6
 }

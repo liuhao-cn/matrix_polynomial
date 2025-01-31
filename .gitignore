@@ -30,3 +30,13 @@ wheels/
 # Project specific
 matrix_transform_config.json
 matrix_polynomial_config.json
+obsolete/distorted_grid.png
+obsolete/original_grid.png
+obsolete/test_line_detector.py
+obsolete/line_detector.py
+line_detect/test_detector.py
+line_detect/line_detector.py
+line_detect/fitted_curves.json
+line_detect/detector_config.json
+.gitignore
+matrix_polynomial_config.json
