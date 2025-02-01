@@ -8,8 +8,8 @@
         0.0
     ],
     "coefficients_b": [
-        0.0,
         1.0,
+        0.0,
         0.0,
         0.0,
         0.0,
@@ -26,5 +26,5 @@
         ]
     ],
     "transform_type": "Radial",
-    "num_grids": 6
+    "num_grids": 8
 }
