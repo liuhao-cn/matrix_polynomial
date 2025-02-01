@@ -1,6 +1,6 @@
 # Matrix Polynomial Visualization
 
-A tool for visualizing matrix polynomial transformations in the complex plane.
+A tool for visualizing matrix polynomial transformations in the complex or hypercomplex plane.
 
 ## Features
 
@@ -42,7 +42,7 @@ MIT License
 
 # 矩阵多项式可视化
 
-一个用于在复平面上可视化矩阵多项式变换的工具。
+一个用于在复平面或超复平面上可视化矩阵多项式变换的工具。
 
 ## 功能特点
 
