@@ -1,16 +1,14 @@
-# Matrix Polynomial Visualization Tool
+# Matrix Polynomial Visualization
 
-A visualization tool for matrix polynomials of the form P(x*I + y*G), where I is the identity matrix and G is a user-defined 2x2 matrix.
+A tool for visualizing matrix polynomial transformations in the complex plane.
 
 ## Features
 
-- Interactive GUI for matrix G and polynomial coefficients input
-- Six grid pattern options: H+V, H, V, C+R, C, R
-- Real-time visualization with input-output plane comparison
-- Adjustable plot range and grid density
-- Coefficient scanning functionality
-- High-quality PDF export
-- Auto-scaling plot ranges
+- Interactive matrix and coefficient input
+- Multiple grid pattern options
+- Real-time visualization
+- PDF export functionality
+- Coefficient scanning animation
 
 ## Installation
 
@@ -22,7 +20,7 @@ cd matrix_polynomial
 
 2. Install required packages:
 ```bash
-pip install -r requirements.txt
+pip install numpy matplotlib
 ```
 
 ## Usage
@@ -32,26 +30,52 @@ Run the GUI application:
 python matrix_polynomial_GUI.py
 ```
 
-For detailed usage instructions, see [Usage Guide](docs/usage_guide.md).
-
-## Requirements
-
-- Python 3.8+
-- NumPy
-- Matplotlib
-- tkinter
-
-See `requirements.txt` for detailed version requirements.
-
-## Documentation
-
-- [Usage Guide](docs/usage_guide.md): Detailed instructions for using the tool
-- [Examples](docs/examples.md): Common use cases and example configurations
+## Project Structure
+- `matrix_polynomial_GUI.py`: Main GUI application
+- `matrix_polynomial_math.py`: Core mathematical functions
+- `matrix_polynomial_config.json`: Saved configuration
 
 ## License
-
 MIT License
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+# 矩阵多项式可视化
+
+一个用于在复平面上可视化矩阵多项式变换的工具。
+
+## 功能特点
+
+- 交互式矩阵和系数输入
+- 多种网格模式选项
+- 实时可视化
+- PDF 导出功能
+- 系数扫描动画
+
+## 安装
+
+1. 克隆此仓库：
+```bash
+git clone https://github.com/liuhao-cn/matrix_polynomial.git
+cd matrix_polynomial
+```
+
+2. 安装所需包：
+```bash
+pip install numpy matplotlib
+```
+
+## 使用方法
+
+运行 GUI 应用程序：
+```bash
+python matrix_polynomial_GUI.py
+```
+
+## 项目结构
+- `matrix_polynomial_GUI.py`：主 GUI 应用程序
+- `matrix_polynomial_math.py`：核心数学函数
+- `matrix_polynomial_config.json`：保存的配置
+
+## 许可证
+MIT 许可证
