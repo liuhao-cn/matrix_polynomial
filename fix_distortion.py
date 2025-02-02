@@ -1,12 +1,68 @@
 # -*- coding: utf-8 -*-
 """
-网格畸变校正系统
-功能：
-1. 生成标准网格图像
-2. 应用多项式畸变并添加噪声
-3. 采样特征点估计畸变参数
-4. 执行图像校正
-5. 可视化对比结果
+Image Distortion Correction Demo
+
+This script demonstrates the polynomial-based image distortion correction system.
+It includes:
+- Grid image generation for testing
+- Distortion simulation with noise
+- Parameter estimation from control points
+- Image correction using polynomial transformation
+- Result visualization and comparison
+
+Features:
+1. Grid Generation
+   - Configurable grid density and size
+   - Anti-aliasing with Gaussian blur
+
+2. Distortion Simulation
+   - Polynomial-based distortion transform
+   - Optional Gaussian noise
+
+3. Parameter Estimation
+   - Random sampling of feature points
+   - Least squares coefficient estimation
+   - Automatic comparison with ground truth
+
+4. Image Correction
+   - Inverse polynomial transformation
+   - High-precision bilinear interpolation
+
+5. Visualization
+   - Multi-window comparison
+   - RGB channel overlay option
+
+图像畸变校正演示
+
+本脚本演示基于多项式的图像畸变校正系统。
+包含功能：
+- 用于测试的网格图像生成
+- 带噪声的畸变模拟
+- 从控制点估计参数
+- 使用多项式变换的图像校正
+- 结果可视化和对比
+
+特性：
+1. 网格生成
+   - 可配置的网格密度和尺寸
+   - 使用高斯模糊的抗锯齿处理
+
+2. 畸变模拟
+   - 基于多项式的畸变变换
+   - 可选的高斯噪声
+
+3. 参数估计
+   - 特征点随机采样
+   - 最小二乘系数估计
+   - 与真实值自动对比
+
+4. 图像校正
+   - 逆多项式变换
+   - 高精度双线性插值
+
+5. 可视化
+   - 多窗口对比
+   - RGB通道叠加选项
 """
 
 import numpy as np
@@ -14,12 +70,13 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.offsetbox import OffsetImage
 import cv2
-from matrix_polynomial_math import generate_powers
+from matrix_polynomial_math import generate_powers, compute_polynomial, backward_transform
 import time
 import threading
+from typing import Tuple, Optional
 
 # ===================== 全局可调参数 =====================
-INTERP_RANGE = 2         # 插值邻域范围，出现细碎空区时增大该值
+INTERP_RANGE = 4         # 插值邻域范围，出现细碎空区时增大该值
 
 # 畸变模型参数
 POLY_COEFFS_A = [1,  0e-3, -1e-1, 0e-1, -1e-2, 0e-9]  # 多项式A系数（各阶系数）
@@ -83,8 +140,6 @@ def forward_transform(image):
     返回：
         tuple: (畸变图像, 归一化X坐标矩阵, 归一化Y坐标矩阵, 归一化畸变X坐标矩阵, 归一化畸变Y坐标矩阵)
     """
-    from matrix_polynomial_math import compute_polynomial
-    
     h, w = image.shape
     y, x = np.mgrid[:h, :w]
     
@@ -225,7 +280,49 @@ def display(original_image, distorted_image, corrected_image):
     )
     plt.show()
 
-
+def generate_grid(cols: int = GRID_COLS, 
+                 rows: int = GRID_ROWS, 
+                 cell_size: int = CELL_SIZE) -> np.ndarray:
+    """
+    Generate a grid image for distortion testing.
+    
+    Args:
+        cols: Number of grid columns
+        rows: Number of grid rows
+        cell_size: Size of each grid cell in pixels
+        
+    Returns:
+        np.ndarray: Grid image (uint8 grayscale)
+        
+    生成用于畸变测试的网格图像。
+    
+    参数：
+        cols: 网格列数
+        rows: 网格行数
+        cell_size: 每个网格单元的像素大小
+        
+    返回：
+        np.ndarray: 网格图像（uint8灰度图）
+    """
+    # 初始化白色背景图像
+    image = np.ones((rows*cell_size, cols*cell_size), dtype=np.uint8)*255
+    
+    # 绘制水平网格线
+    for i in range(rows + 1):
+        y = i * cell_size
+        start = max(0, y - LINE_WIDTH//2)
+        end = min(image.shape[0], y + LINE_WIDTH//2 + 1)
+        image[start:end, :] = 0
+    
+    # 绘制垂直网格线
+    for j in range(cols + 1):
+        x = j * cell_size
+        start = max(0, x - LINE_WIDTH//2)
+        end = min(image.shape[1], x + LINE_WIDTH//2 + 1)
+        image[:, start:end] = 0
+    
+    # 应用高斯模糊
+    return cv2.GaussianBlur(image, GAUSSIAN_KERNEL, GAUSSIAN_SIGMA)
 
 if __name__ == '__main__':
     total_start = time.time()
@@ -255,7 +352,6 @@ if __name__ == '__main__':
     
     # 根据多项式系数生成校正图像
     t4 = time.time()
-    from matrix_polynomial_math import backward_transform
     corrected_image = backward_transform(
         distorted_image, 
         a_est, 

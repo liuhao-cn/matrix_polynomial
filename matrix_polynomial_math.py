@@ -1,29 +1,21 @@
 """
-Matrix Polynomial Math Module
+Matrix Polynomial Math Module for Image Distortion Correction
 
-This module provides core mathematical functions for matrix polynomial calculations.
-The main functionality includes:
+This module provides core mathematical functions for polynomial-based image distortion correction.
+Key features:
 - Matrix decomposition into I and G components
 - Generation of polynomial power terms
-- Computation of matrix polynomials
-- Grid point generation for visualization
-+ Basic matrix polynomial computations:
-+   - Matrix decomposition into I and G components
-+   - Generation of polynomial power terms
-+   - Computation of matrix polynomials
+- Forward and backward polynomial transformations
+- High-resolution interpolation
 
 矩阵多项式数学模块
 
-本模块提供矩阵多项式计算的核心数学函数。
-主要功能包括：
-- 将矩阵分解为 I 和 G 分量
+本模块提供基于多项式的图像畸变校正核心数学函数。
+主要特性：
+- 矩阵分解为I和G分量
 - 生成多项式幂次项
-- 计算矩阵多项式
-- 生成用于可视化的网格点
-+ 基础矩阵多项式计算：
-+   - 将矩阵分解为 I 和 G 分量
-+   - 生成多项式幂次项
-+   - 计算矩阵多项式
+- 正向和反向多项式变换
+- 高分辨率插值
 """
 
 import numpy as np
@@ -31,21 +23,6 @@ from typing import Sequence
 import threading
 import sys
 import os
-
-# Add src directory to Python path
-src_dir = os.path.dirname(os.path.abspath(__file__))
-if src_dir not in sys.path:
-    sys.path.append(src_dir)
-
-# Try to import C implementation
-try:
-    import interpolation_core
-    HAS_C_IMPL = True
-    print("使用 C 实现的插值算法")
-except ImportError as e:
-    HAS_C_IMPL = False
-    print(f"导入 C 实现失败: {e}")
-    print("使用 Python 实现的插值算法")
 
 def decompose_matrix(w: np.ndarray, G: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -336,7 +313,6 @@ def solve_poly_coeff(x_src: np.ndarray, y_src: np.ndarray, u_dst: np.ndarray, v_
     # Decouple coefficients
     return (a_p_b + a_m_b)/2, (a_p_b - a_m_b)/2
 
-
 def backward_transform(img: np.ndarray, a_est: np.ndarray, b_est: np.ndarray,
                       I: np.ndarray, G: np.ndarray, interp_range: int = 2) -> np.ndarray:
     """
@@ -421,15 +397,6 @@ def backward_transform(img: np.ndarray, a_est: np.ndarray, b_est: np.ndarray,
         Returns:
             np.ndarray: Interpolated values
         """
-        # Use C implementation if available
-        if HAS_C_IMPL:
-            return interpolation_core.run_interpolation_c(
-                img.astype(np.float32),
-                u.astype(np.float32),
-                v.astype(np.float32)
-            )
-        
-        # Fall back to Python implementation
         results = np.zeros((4, img.shape[0], img.shape[1]), dtype=np.float32)
         u_floor = np.floor(u).astype(int).clip(0, img.shape[1]-2)
         v_floor = np.floor(v).astype(int).clip(0, img.shape[0]-2)

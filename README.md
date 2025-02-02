@@ -1,35 +1,173 @@
-# 畸变校正系统 (Distortion Correction System)
+# Polynomial Distortion Correction System
 
-一个基于矩阵多项式的图像畸变校正系统，通过网格图像演示了畸变建模、参数估计和校正过程。
+A matrix polynomial-based image distortion correction solution
 
-## 功能特点
+## Key Features
 
-1. **网格图像生成**
+- Polynomial-based distortion model
+- High-precision bilinear interpolation
+- Multi-threaded acceleration
+- Pure Python implementation
+
+## Technical Advantages
+
+- No compilation required
+- Optimized matrix operations with NumPy
+- Intuitive visualization tools
+
+## Installation & Usage
+
+### Prerequisites
+- Python 3.7+
+- NumPy 1.19+
+- OpenCV 4.0+
+- Matplotlib 3.3+
+
+### Basic Usage
+```python
+import fix_distortion as fd
+
+# Load and correct image
+img = fd.load_image("distorted.png")
+corrected = fd.correct_distortion(img)
+
+# Save result
+fd.save_image("corrected.png", corrected)
+```
+
+## Core Functionality
+
+1. **Grid Generation**
+   - Configurable grid density and size
+   - Anti-aliasing with Gaussian blur
+
+2. **Distortion Simulation**
+   - Polynomial-based distortion model
+   - Configurable Gaussian noise
+
+3. **Parameter Estimation**
+   - Random feature point sampling
+   - Least squares coefficient estimation
+   - Automatic ground truth comparison
+
+4. **Image Correction**
+   - Inverse polynomial transformation
+   - High-precision interpolation
+
+5. **Visualization**
+   - Multi-window comparison
+   - RGB channel overlay
+
+## Quick Start
+
+1. Clone repository:
+```bash
+git clone https://github.com/example/distortion_correction.git
+cd distortion_correction
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Run demo:
+```bash
+python src/fix_distortion.py
+```
+
+## Implementation Details
+
+### Coordinate System
+- Normalized coordinates [-1, 1]
+- Automatic coordinate mapping
+
+### Mathematical Model
+- Matrix polynomial transformation
+- Support for high-order polynomials
+
+### Image Processing
+- OpenCV-based remapping
+- Precision interpolation algorithms
+
+## System Requirements
+
+- Python 3.7+
+- OpenCV 4.0+
+- NumPy 1.19+
+- Matplotlib 3.3+
+
+## License
+
+MIT License
+
+---
+
+# 多项式图像畸变校正系统
+
+基于矩阵多项式的图像畸变校正解决方案
+
+## 主要特性
+
+- 基于多项式模型的畸变校正
+- 高精度双线性插值算法
+- 多线程加速计算
+- 纯Python实现
+
+## 技术优势
+
+- 无需编译安装
+- 基于NumPy的矩阵运算优化
+- 直观的可视化工具
+
+## 安装与使用
+
+### 环境要求
+- Python 3.7+
+- NumPy 1.19+
+- OpenCV 4.0+
+- Matplotlib 3.3+
+
+### 基本用法
+```python
+import fix_distortion as fd
+
+# 加载并校正图像
+img = fd.load_image("distorted.png")
+corrected = fd.correct_distortion(img)
+
+# 保存结果
+fd.save_image("corrected.png", corrected)
+```
+
+## 核心功能
+
+1. **网格生成**
    - 可配置网格密度和尺寸
-   - 支持高斯模糊抗锯齿处理
+   - 高斯模糊抗锯齿处理
 
 2. **畸变模拟**
    - 基于多项式模型的畸变变换
-   - 支持添加高斯噪声模拟真实情况
+   - 可配置高斯噪声
 
 3. **参数估计**
-   - 随机采样特征点对
-   - 最小二乘法估计畸变系数
-   - 自动对比真实与估计系数
+   - 随机特征点采样
+   - 最小二乘法系数估计
+   - 自动真实值对比
 
 4. **图像校正**
-   - 基于逆多项式变换的校正
-   - 高精度双线性插值重建
+   - 逆多项式变换
+   - 高精度插值算法
 
-5. **结果可视化**
+5. **可视化**
    - 多窗口对比显示
-   - 支持红绿通道叠加对比
+   - RGB通道叠加对比
 
-## 安装
+## 快速开始
 
-1. 克隆此仓库：
+1. 克隆仓库：
 ```bash
-git clone https://github.com/liuhao-cn/distortion_correction.git
+git clone https://github.com/example/distortion_correction.git
 cd distortion_correction
 ```
 
@@ -38,60 +176,24 @@ cd distortion_correction
 pip install -r requirements.txt
 ```
 
-## 快速开始
-
-运行演示程序：
+3. 运行演示：
 ```bash
 python src/fix_distortion.py
 ```
 
-## 参数配置
+## 实现细节
 
-在 src/fix_distortion.py 中可以调整以下参数：
+### 坐标系统
+- 归一化坐标 [-1, 1]
+- 自动坐标映射
 
-```python
-# 网格参数
-GRID_COLS = 32           # 网格横向单元格数量
-GRID_ROWS = 24           # 网格纵向单元格数量
-CELL_SIZE = 50           # 单元格边长（像素）
+### 数学模型
+- 矩阵多项式变换
+- 支持高阶多项式
 
-# 畸变参数
-POLY_COEFFS_A = [...]    # 多项式A系数
-POLY_COEFFS_B = [...]    # 多项式B系数
-NOISE_STD = 2.0          # 噪声标准差
-
-# 校正参数
-INTERP_RANGE = 2         # 插值邻域范围
-SAMPLE_POINTS = 50       # 采样点数量
-```
-
-## 技术实现
-
-1. **坐标系统**
-   - 使用归一化坐标系统 [-1,1]
-   - 自动处理坐标映射和逆映射
-
-2. **数学模型**
-   - 基于矩阵多项式的变换模型
-   - 支持高阶多项式拟合
-
-3. **图像处理**
-   - OpenCV 实现图像重映射
-   - 高精度插值算法
-
-## 项目结构
-
-```
-distortion_correction/
-├── README.md           # 项目说明文档
-├── requirements.txt    # 依赖包列表
-├── src/
-│   ├── __init__.py
-│   ├── fix_distortion.py      # 主程序
-│   └── matrix_polynomial_math.py  # 数学库
-└── tests/
-    └── __init__.py
-```
+### 图像处理
+- 基于OpenCV的重映射
+- 高精度插值算法
 
 ## 系统要求
 
@@ -100,15 +202,15 @@ distortion_correction/
 - NumPy 1.19+
 - Matplotlib 3.3+
 
-## 使用许可
+## 许可协议
 
-MIT License
+MIT 许可证
 
-## 作者
+## 作者信息
 
 [作者信息]
 
-## 更新日志
+## 版本历史
 
 ### v1.0.0 (2024-03-xx)
 - 初始版本发布
