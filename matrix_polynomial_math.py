@@ -86,16 +86,16 @@ def generate_powers(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarray,
     """
     Generate base matrices in terms of f and g for the polynomial computation.
     For each power i, compute (xI + yG)^i = f[i,:]*I + g[i,:]*G, where:
-    - f[i,:] contains the coefficients of I for power i
-    - g[i,:] contains the coefficients of G for power i
-    This function handles the non-commutative matrix multiplication correctly.
+    - f[0,:] = x (first order term)
+    - g[0,:] = y (first order term)
+    Higher powers are computed through non-commutative matrix multiplication.
     
     Args:
         x (np.ndarray): x-coordinates, shape (N,)
         y (np.ndarray): y-coordinates, shape (N,)
         I (np.ndarray): 2x2 identity matrix
         G (np.ndarray): 2x2 basis matrix
-        num_terms (int): Number of terms in polynomial
+        num_terms (int): Number of terms in polynomial (excluding constant term)
         
     Returns:
         tuple[np.ndarray, np.ndarray]: 
@@ -108,16 +108,16 @@ def generate_powers(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarray,
     
     为多项式计算生成基底矩阵的 f 和 g 分量。
     对于每个幂次 i，计算 (xI + yG)^i = f[i,:]*I + g[i,:]*G，其中：
-    - f[i,:] 包含幂次 i 对应的 I 的系数
-    - g[i,:] 包含幂次 i 对应的 G 的系数
-    该函数正确处理了非交换的矩阵乘法。
+    - f[0,:] = x（一阶项）
+    - g[0,:] = y（一阶项）
+    更高次幂通过非交换矩阵乘法计算。
     
     参数：
         x (np.ndarray)：x 坐标，形状为 (N,)
         y (np.ndarray)：y 坐标，形状为 (N,)
         I (np.ndarray)：2x2 单位矩阵
         G (np.ndarray)：2x2 基底矩阵
-        num_terms (int)：多项式的项数
+        num_terms (int)：多项式的项数（不包括常数项）
         
     返回值：
         tuple[np.ndarray, np.ndarray]：
@@ -151,12 +151,12 @@ def generate_powers(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarray,
     f = np.zeros((num_terms, N))  # Coefficients of I
     g = np.zeros((num_terms, N))  # Coefficients of G
     
-    # First power
+    # First power (i=1)
     w = np.outer(np.ravel(I), x) + np.outer(np.ravel(G), y)  # w = xI + yG
     w = np.reshape(w, (2, 2, N))
     f[0], g[0] = decompose_matrix(w, G)
     
-    # Higher powers
+    # Higher powers through matrix multiplication
     if num_terms > 1:
         w1 = w.copy()
         for i in range(1, num_terms):
@@ -168,9 +168,9 @@ def generate_powers(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarray,
 def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarray,
                       coeffs_a: Sequence[float], coeffs_b: Sequence[float]) -> tuple[np.ndarray, np.ndarray]:
     """
-    Evaluate the matrix polynomial P(xI + yG) = sum(a_i*I + b_i*G)(xI + yG)^i.
-    This function computes the polynomial value for each input point (x,y).
-    The computation handles non-commutative matrix multiplication correctly.
+    Evaluate the matrix polynomial P(xI + yG) = (xI + yG) + sum(a_i*I + b_i*G)(xI + yG)^i.
+    The first terms (i=1) correspond to the identity transformation (x,y),
+    followed by higher order terms with coefficients a_i and b_i.
     
     Args:
         x (np.ndarray): x-coordinates of input points, shape (N,)
@@ -187,9 +187,9 @@ def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarra
         TypeError: If inputs have wrong types
         ValueError: If shapes are incorrect or coefficients lists have different lengths
 
-    计算矩阵多项式 P(xI + yG) = sum(a_i*I + b_i*G)(xI + yG)^i。
-    此函数为每个输入点 (x,y) 计算多项式值。
-    计算过程正确处理了非交换的矩阵乘法。
+    计算矩阵多项式 P(xI + yG) = (xI + yG) + sum(a_i*I + b_i*G)(xI + yG)^i。
+    第一项（i=1）对应于单位变换 (x,y)，
+    后面是带系数 a_i 和 b_i 的高阶项。
     
     参数：
         x (np.ndarray)：输入点的 x 坐标，形状为 (N,)
@@ -228,7 +228,7 @@ def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarra
     if len(coeffs_a) != len(coeffs_b):
         raise ValueError(f"coeffs_a and coeffs_b must have same length, got {len(coeffs_a)} and {len(coeffs_b)}")
     
-    # Generate base matrices for each power
+    # Generate base matrices for each power (starting from power 1)
     f, g = generate_powers(x, y, I, G, len(coeffs_a))
     
     # Convert coefficients to arrays for matrix multiplication
