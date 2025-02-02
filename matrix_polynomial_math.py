@@ -28,6 +28,24 @@ The main functionality includes:
 
 import numpy as np
 from typing import Sequence
+import threading
+import sys
+import os
+
+# Add src directory to Python path
+src_dir = os.path.dirname(os.path.abspath(__file__))
+if src_dir not in sys.path:
+    sys.path.append(src_dir)
+
+# Try to import C implementation
+try:
+    import interpolation_core
+    HAS_C_IMPL = True
+    print("使用 C 实现的插值算法")
+except ImportError as e:
+    HAS_C_IMPL = False
+    print(f"导入 C 实现失败: {e}")
+    print("使用 Python 实现的插值算法")
 
 def decompose_matrix(w: np.ndarray, G: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -240,3 +258,225 @@ def compute_polynomial(x: np.ndarray, y: np.ndarray, I: np.ndarray, G: np.ndarra
     v = coeffs_b @ f + coeffs_a @ g  # Coefficient of G
     
     return u, v 
+
+def solve_poly_coeff(x_src: np.ndarray, y_src: np.ndarray, u_dst: np.ndarray, v_dst: np.ndarray,
+                    I: np.ndarray, G: np.ndarray, num_terms: int) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Solve polynomial coefficients from corresponding points.
+    For given source points (x_src, y_src) and their distorted positions (u_dst, v_dst),
+    find the polynomial coefficients that best describe the transformation.
+    
+    Args:
+        x_src (np.ndarray): Source x-coordinates, normalized to [-1,1], shape (N,)
+        y_src (np.ndarray): Source y-coordinates, normalized to [-1,1], shape (N,)
+        u_dst (np.ndarray): Distorted x-coordinates, normalized to [-1,1], shape (N,)
+        v_dst (np.ndarray): Distorted y-coordinates, normalized to [-1,1], shape (N,)
+        I (np.ndarray): 2x2 identity matrix
+        G (np.ndarray): 2x2 basis matrix
+        num_terms (int): Number of polynomial terms
+    
+    Returns:
+        tuple[np.ndarray, np.ndarray]: 
+            - Coefficients for I terms (a_coeffs)
+            - Coefficients for G terms (b_coeffs)
+            
+    Raises:
+        TypeError: If inputs have wrong types
+        ValueError: If shapes are incorrect
+    
+    从对应点求解多项式系数。
+    对于给定的源点 (x_src, y_src) 和其畸变位置 (u_dst, v_dst)，
+    找到最佳描述该变换的多项式系数。
+    
+    参数：
+        x_src (np.ndarray)：源 x 坐标，归一化到 [-1,1]，形状为 (N,)
+        y_src (np.ndarray)：源 y 坐标，归一化到 [-1,1]，形状为 (N,)
+        u_dst (np.ndarray)：畸变 x 坐标，归一化到 [-1,1]，形状为 (N,)
+        v_dst (np.ndarray)：畸变 y 坐标，归一化到 [-1,1]，形状为 (N,)
+        I (np.ndarray)：2x2 单位矩阵
+        G (np.ndarray)：2x2 基底矩阵
+        num_terms (int)：多项式项数
+    
+    返回值：
+        tuple[np.ndarray, np.ndarray]：
+            - I 项的系数 (a_coeffs)
+            - G 项的系数 (b_coeffs)
+            
+    异常：
+        TypeError：如果输入类型错误
+        ValueError：如果形状不正确
+    """
+    # Check input vectors
+    if not isinstance(x_src, np.ndarray) or not isinstance(y_src, np.ndarray):
+        raise TypeError(f"x_src and y_src must be numpy arrays, got {type(x_src)} and {type(y_src)}")
+    if x_src.ndim != 1 or y_src.ndim != 1:
+        raise ValueError(f"x_src and y_src must be 1-dimensional, got {x_src.ndim} and {y_src.ndim} dimensions")
+    if len(x_src) != len(y_src):
+        raise ValueError(f"x_src and y_src must have same length, got {len(x_src)} and {len(y_src)}")
+    
+    # Generate polynomial terms matrix
+    f, g = generate_powers(
+        x_src,  
+        y_src,
+        I=I,
+        G=G,
+        num_terms=num_terms
+    )
+
+    # Build linear system
+    f_p_g = (f + g).transpose()  # f+g terms matrix transposed
+    f_m_g = (f - g).transpose()  # f-g terms matrix transposed
+    u_p_v = (u_dst + v_dst).ravel()  # u+v vector
+    u_m_v = (u_dst - v_dst).ravel()  # u-v vector
+
+    # Solve least squares
+    a_p_b, _, _, _ = np.linalg.lstsq(f_p_g, u_p_v, rcond=None)
+    a_m_b, _, _, _ = np.linalg.lstsq(f_m_g, u_m_v, rcond=None)
+
+    # Decouple coefficients
+    return (a_p_b + a_m_b)/2, (a_p_b - a_m_b)/2
+
+
+def backward_transform(img: np.ndarray, a_est: np.ndarray, b_est: np.ndarray,
+                      I: np.ndarray, G: np.ndarray, interp_range: int = 2) -> np.ndarray:
+    """
+    Apply inverse polynomial transformation to correct image distortion.
+    Uses high-resolution interpolation to improve accuracy.
+    
+    Args:
+        img (np.ndarray): Input distorted image (uint8 grayscale)
+        a_est (np.ndarray): Estimated coefficients for I terms
+        b_est (np.ndarray): Estimated coefficients for G terms
+        I (np.ndarray): 2x2 identity matrix
+        G (np.ndarray): 2x2 basis matrix
+        interp_range (int, optional): Interpolation neighborhood range. Defaults to 2
+    
+    Returns:
+        np.ndarray: Corrected image (uint8 format)
+        
+    Raises:
+        TypeError: If inputs have wrong types
+        ValueError: If shapes are incorrect
+    
+    应用逆多项式变换校正图像畸变。
+    使用高分辨率插值以提高精度。
+    
+    参数：
+        img (np.ndarray)：输入的畸变图像（uint8 灰度图）
+        a_est (np.ndarray)：I 项的估计系数
+        b_est (np.ndarray)：G 项的估计系数
+        I (np.ndarray)：2x2 单位矩阵
+        G (np.ndarray)：2x2 基底矩阵
+        interp_range (int, optional)：插值邻域范围，默认为 2
+    
+    返回值：
+        np.ndarray：校正后的图像（uint8 格式）
+        
+    异常：
+        TypeError：如果输入类型错误
+        ValueError：如果形状不正确
+    """
+    # Check inputs
+    if not isinstance(img, np.ndarray):
+        raise TypeError(f"img must be a numpy array, got {type(img)}")
+    if img.ndim != 2:
+        raise ValueError(f"img must be 2-dimensional, got {img.ndim} dimensions")
+    
+    scale = interp_range
+    h0, w0 = img.shape
+
+    # Generate high resolution image
+    img_high = np.kron(img, np.ones((scale, scale))).astype(np.float32)
+    weight_high = np.ones_like(img_high)
+    h, w = img_high.shape
+    
+    # Generate coordinate grid
+    y, x = np.mgrid[:h, :w]
+    
+    # Normalize coordinates to [-1,1] range
+    x_uni = (x.astype(np.float32) - w/2) / (w/2)
+    y_uni = (y.astype(np.float32) - h/2) / (h/2)
+    
+    # Compute inverse transformation coordinates
+    u, v = compute_polynomial( 
+        x_uni.ravel(), y_uni.ravel(),
+        I=I, G=G,
+        coeffs_a=a_est, coeffs_b=b_est
+    )
+    
+    # Convert back to pixel coordinates
+    u_float = (u * w/2 + w/2).reshape(h, w)
+    v_float = (v * h/2 + h/2).reshape(h, w)
+    
+    # Inline interpolation function
+    def run_interpolation(img: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+        """
+        Perform bilinear interpolation.
+        
+        Args:
+            img (np.ndarray): Source image
+            u (np.ndarray): x coordinates
+            v (np.ndarray): y coordinates
+            
+        Returns:
+            np.ndarray: Interpolated values
+        """
+        # Use C implementation if available
+        if HAS_C_IMPL:
+            return interpolation_core.run_interpolation_c(
+                img.astype(np.float32),
+                u.astype(np.float32),
+                v.astype(np.float32)
+            )
+        
+        # Fall back to Python implementation
+        results = np.zeros((4, img.shape[0], img.shape[1]), dtype=np.float32)
+        u_floor = np.floor(u).astype(int).clip(0, img.shape[1]-2)
+        v_floor = np.floor(v).astype(int).clip(0, img.shape[0]-2)
+        
+        # Calculate relative offsets
+        dx = np.abs(u - u_floor)
+        dy = np.abs(v - v_floor)
+
+        # Define arrays for parallel computation
+        shifts = [(0, 0), (0, 1), (1, 0), (1, 1)]
+        weights = np.zeros((4, img.shape[0], img.shape[1]), dtype=np.float32)
+        weights[0] = (1-dy)*(1-dx)*img
+        weights[1] = (1-dy)*dx*img
+        weights[2] = dy*(1-dx)*img
+        weights[3] = dy*dx*img
+
+        # Parallel computation of corner weights
+        def start_thread(i: int):
+            y_shift, x_shift = shifts[i]    
+            np.add.at(results[i], (v_floor+y_shift, u_floor+x_shift), weights[i])
+        
+        threads = [
+            threading.Thread(target=start_thread, args=(i,))
+            for i in range(4)
+        ]
+        
+        for t in threads:
+            t.start()
+        
+        for t in threads:
+            t.join()
+        
+        return sum(results)
+    
+    # Perform bilinear interpolation
+    fixed_high = run_interpolation(img_high, u_float, v_float)
+    weight_high = run_interpolation(weight_high, u_float, v_float)
+    
+    # Downsample
+    fixed_low = fixed_high.reshape(h0, scale, w0, scale).sum(axis=(1,3))
+    weight_low = weight_high.reshape(h0, scale, w0, scale).sum(axis=(1,3))
+    
+    # Weighted average for final result
+    with np.errstate(divide='ignore', invalid='ignore'):
+        fixed_low = np.divide(fixed_low, weight_low, where=weight_low!=0)
+        fixed_low[weight_low == 0] = 0
+    
+    result = np.clip(fixed_low, 0, 255).astype(np.uint8)
+    
+    return result 

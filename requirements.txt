@@ -1,6 +1,6 @@
-numpy>=1.21.0
-matplotlib>=3.4.0
+numpy>=1.19.0
+matplotlib>=3.3.0
 tk>=0.1.0
 pillow>=10.0.0  # For image saving
 scipy>=1.11.0  # For numerical computations
-opencv-python>=4.5.0
+opencv-python>=4.0.0
