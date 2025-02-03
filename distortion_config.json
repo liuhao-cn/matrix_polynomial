@@ -1,0 +1,29 @@
+{
+    "grid_cols": "16",
+    "grid_rows": "12",
+    "cell_size": "100",
+    "noise_level": "0.5",
+    "interp_range": "1",
+    "G_matrix": [
+        [
+            0.0,
+            1.0
+        ],
+        [
+            1.0,
+            0.0
+        ]
+    ],
+    "I_coef_1": "1",
+    "G_coef_1": "0.0",
+    "I_coef_2": "0",
+    "G_coef_2": "0",
+    "I_coef_3": "0",
+    "G_coef_3": "0.0",
+    "I_coef_4": "0.1",
+    "G_coef_4": "0",
+    "I_coef_5": "0.0",
+    "G_coef_5": "0.0",
+    "I_coef_6": "0.0",
+    "G_coef_6": "0"
+}

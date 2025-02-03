@@ -76,7 +76,7 @@ import threading
 from typing import Tuple, Optional
 
 # ===================== 全局可调参数 =====================
-INTERP_RANGE = 4         # 插值邻域范围，出现细碎空区时增大该值
+INTERP_RANGE = 2         # 插值邻域范围，出现细碎空区时增大该值
 
 # 畸变模型参数
 POLY_COEFFS_A = [1,  0e-3, -1e-1, 0e-1, -1e-2, 0e-9]  # 多项式A系数（各阶系数）
